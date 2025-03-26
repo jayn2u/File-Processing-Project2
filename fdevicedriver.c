@@ -14,8 +14,8 @@ int fdd_read(int ppn, char *pagebuf)
 {
 	int ret;
 
-	fseek(flashfp, PAGE_SIZE*ppn, SEEK_SET);
-	ret = fread((void *)pagebuf, PAGE_SIZE, 1, flashfp);
+	fseek(flashmemoryfp, PAGE_SIZE*ppn, SEEK_SET);
+	ret = fread((void *)pagebuf, PAGE_SIZE, 1, flashmemoryfp);
 	if(ret == 1) {
 		return 1;
 	}
@@ -28,8 +28,8 @@ int fdd_write(int ppn, char *pagebuf)
 {
 	int ret;
 
-	fseek(flashfp, PAGE_SIZE*ppn, SEEK_SET);
-	ret = fwrite((void *)pagebuf, PAGE_SIZE, 1, flashfp);
+	fseek(flashmemoryfp, PAGE_SIZE*ppn, SEEK_SET);
+	ret = fwrite((void *)pagebuf, PAGE_SIZE, 1, flashmemoryfp);
 	if(ret == 1) {			
 		return 1;
 	}
@@ -45,9 +45,9 @@ int fdd_erase(int pbn)
 
 	memset((void*)blockbuf, (char)0xFF, BLOCK_SIZE);
 	
-	fseek(flashfp, BLOCK_SIZE*pbn, SEEK_SET);
+	fseek(flashmemoryfp, BLOCK_SIZE*pbn, SEEK_SET);
 	
-	ret = fwrite((void *)blockbuf, BLOCK_SIZE, 1, flashfp);
+	ret = fwrite((void *)blockbuf, BLOCK_SIZE, 1, flashmemoryfp);
 	
 	if(ret == 1) { 
 		return 1;
