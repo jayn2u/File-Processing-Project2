@@ -90,3 +90,10 @@ jobs:
             echo "After erase, ppn=8 changed: expected '$expected', got '$output'"
             exit 1
           fi
+          # Check another page in block 0, say ppn=1
+          output=$(./a.out r flashmemory 1)
+          expected=" -1"
+          if [ "$output" != "$expected" ]; then
+            echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
+            exit 1
+          fi
