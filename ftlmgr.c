@@ -11,7 +11,7 @@ int create_flashmemory_emulator(char *filename, char *blockbuf, int block_num);
 
 int write_pages(char *pagebuf, char *flashfile, int ppn, const char *sectordata, const char *sparedata);
 
-int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf);
+int read_pages(char *pagebuf, char *sectorbuf, char *sparebuf, char *flashfile, int ppn);
 
 int erase_block(char *flashfile, int pbn);
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'r':
-            ret = read_pages(argv, pagebuf, sectorbuf, sparebuf);
+            ret = read_pages(pagebuf, sectorbuf, sparebuf, argv[2], atoi(argv[3]));
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "페이지 읽기 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -155,14 +155,12 @@ int write_pages(char *pagebuf, char *flashfile, int ppn, const char *sectordata,
     return EXIT_SUCCESS;
 }
 
-int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
-    flashmemoryfp = fopen(argv[2], "rb");
+int read_pages(char *pagebuf, char *sectorbuf, char *sparebuf, char *flashfile, int ppn) {
+    flashmemoryfp = fopen(flashfile, "rb");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
-
-    int ppn = atol(argv[3]);
 
     fdd_read(ppn, pagebuf);
 
@@ -177,6 +175,7 @@ int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
         return EXIT_SUCCESS;
     }
 
+    // FIXME: erase로 이관 가능
     memcpy(sectorbuf, pagebuf, strlen(pagebuf));
     memcpy(sparebuf, pagebuf + SECTOR_SIZE, strlen(pagebuf + SECTOR_SIZE));
 
@@ -206,7 +205,7 @@ int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf)
 
     int ret = 0;
 
-    ret = read_pages(argv, pagebuf, sectorbuf, sparebuf);
+    ret = read_pages(pagebuf, sectorbuf, sparebuf, argv[2], atoi(argv[3]));
     if (ret != EXIT_SUCCESS) {
         fprintf(stderr, "In-place 업데이트 중 페이지 읽기 간 문제가 발생했습니다.\n");
         fclose(flashmemoryfp);
