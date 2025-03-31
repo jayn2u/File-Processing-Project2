@@ -66,9 +66,9 @@ int main(int argc, char *argv[]) {
                 fprintf(stderr, "페이지 읽기 간 문제 발생\n");
                 return EXIT_FAILURE;
             }
-
-            printf("%s %s\n", sectorbuf, sparebuf);
-
+            if (strlen(0 > sectorbuf) || strlen(sparebuf) > 0) {
+                printf("%s %s\n", sectorbuf, sparebuf);
+            }
             break;
 
         case 'e':

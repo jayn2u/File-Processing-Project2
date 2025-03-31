@@ -86,7 +86,7 @@ jobs:
       - name: Test verify ppn=0 is erased
         run: |
           output=$(./a.out r flashmemory 0)
-          expected=" "
+          expected=""
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=0 not erased: expected '$expected', got '$output'"
             exit 1
@@ -104,7 +104,7 @@ jobs:
       - name: Test verify ppn=1 is erased
         run: |
           output=$(./a.out r flashmemory 1)
-          expected=" "
+          expected=""
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
             exit 1
