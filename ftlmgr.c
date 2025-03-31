@@ -13,7 +13,7 @@ int write_pages(char *pagebuf, char *flashfile, int ppn, const char *sectordata,
 
 int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf);
 
-int erase_block(char *argv[]);
+int erase_block(char *flashfile, int pbn);
 
 int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf);
 
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'e':
-            ret = erase_block(argv);
+            ret = erase_block(argv[2], atoi(argv[3]));
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "블록 소거 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -184,14 +184,12 @@ int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
     return EXIT_SUCCESS;
 }
 
-int erase_block(char *argv[]) {
-    flashmemoryfp = fopen(argv[2], "rb+");
+int erase_block(const char *flashfile, int pbn) {
+    flashmemoryfp = fopen(flashfile, "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
-
-    const int pbn = atol(argv[3]);
 
     fdd_erase(pbn);
 
