@@ -194,6 +194,8 @@ int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
 
     memcpy(sectorbuf, pagebuf, strlen(pagebuf));
     memcpy(sparebuf, pagebuf + SECTOR_SIZE, strlen(pagebuf + SECTOR_SIZE));
+    sectorbuf[strlen(pagebuf)] = '\0';
+    sparebuf[strlen(pagebuf + SECTOR_SIZE)] = '\0';
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
