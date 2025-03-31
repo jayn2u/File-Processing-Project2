@@ -15,7 +15,7 @@ int read_pages(char *argv[], char *pagebuf);
 
 int erase_block(char *argv[]);
 
-int inplace_update(char *argv[], char *blockbuf, char *pagebuf);
+int inplace_update(char *argv[], char *pagebuf);
 
 int find_target_block(int ppn, int total_blocks_cnt, char *pagebuf);
 
@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'u':
-            ret = inplace_update(argv, blockbuf, pagebuf);
+            ret = inplace_update(argv, pagebuf);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "In-place 업데이트 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -216,24 +216,101 @@ int erase_block(char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-int inplace_update(char *argv[], char *blockbuf, char *pagebuf) {
+int inplace_update(char *argv[], char *pagebuf) {
+    // 플래시 메모리 파일 열기
     flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
-    const int ppn = atoi(argv[3]);
-    const int pbn = ppn / PAGE_NUM;
+    // 업데이트 대상 페이지 및 블록 번호 계산
+    int ppn = atoi(argv[3]);
+    int pbn = ppn / PAGE_NUM;
 
+    // 새로운 데이터 추출
+    char *new_sector = argv[4];
+    char *new_spare = argv[5];
+
+    // 만약 블록이 비어있다면 단순 쓰기 처리
     if (is_block_empty(pbn, pagebuf)) {
-        printf("[DEBUG] ppn이 들어있는 블록이 비어있습니다.\n");
-    } else {
-        printf("[DEBUG] ppn이 들어있는 블록이 비어있지 않습니다.\n");
+        char new_page[PAGE_SIZE];
+        memset(new_page, 0xFF, PAGE_SIZE);
+        int len = strlen(new_sector);
+        if (len > SECTOR_SIZE) len = SECTOR_SIZE;
+        memcpy(new_page, new_sector, len);
+        int spare_len = strlen(new_spare);
+        if (spare_len > SPARE_SIZE) spare_len = SPARE_SIZE;
+        memcpy(new_page + SECTOR_SIZE, new_spare, spare_len);
+
+        if (fdd_write(ppn, new_page) != 1) {
+            fprintf(stderr, "페이지 쓰기 실패: %d\n", ppn);
+            fclose(flashmemoryfp);
+            return EXIT_FAILURE;
+        }
+        printf("#reads=0 #writes=1 #erases=0");
+        fclose(flashmemoryfp);
+        return EXIT_SUCCESS;
     }
 
-    const int target_block_idx = find_target_block(ppn, get_total_blocks(argv[2]), pagebuf);
-    printf("[DEBUG] Target block_idx : %d", target_block_idx);
+    // in-place update를 위한 빈 블록 검색
+    int total_blocks = get_total_blocks(argv[2]);
+    int target_block = find_target_block(ppn, total_blocks, pagebuf);
+    if (target_block < 0) {
+        fprintf(stderr, "빈 블록을 찾을 수 없음.\n");
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
+
+    int reads = 0, writes = 0, erases = 0;
+    char temp_page[PAGE_SIZE];
+
+    // 원본 블록의 모든 페이지를 빈 블록으로 복사 (업데이트 페이지는 새 데이터로 기록)
+    for (int offset = 0; offset < PAGE_NUM; offset++) {
+        int source_ppn = pbn * PAGE_NUM + offset;
+        int target_ppn = target_block * PAGE_NUM + offset;
+
+        if (source_ppn == ppn) { // 업데이트 대상 페이지
+            memset(temp_page, 0xFF, PAGE_SIZE);
+            int len = strlen(new_sector);
+            if (len > SECTOR_SIZE) len = SECTOR_SIZE;
+            memcpy(temp_page, new_sector, len);
+            int spare_len = strlen(new_spare);
+            if (spare_len > SPARE_SIZE) spare_len = SPARE_SIZE;
+            memcpy(temp_page + SECTOR_SIZE, new_spare, spare_len);
+
+            if (fdd_write(target_ppn, temp_page) != 1) {
+                fprintf(stderr, "업데이트 페이지 쓰기 실패: %d\n", target_ppn);
+                fclose(flashmemoryfp);
+                return EXIT_FAILURE;
+            }
+            writes++;
+        } else { // 그대로 복사하는 페이지
+            if (fdd_read(source_ppn, temp_page) != 1) {
+                fprintf(stderr, "페이지 읽기 실패: %d\n", source_ppn);
+                fclose(flashmemoryfp);
+                return EXIT_FAILURE;
+            }
+            reads++;
+            if (fdd_write(target_ppn, temp_page) != 1) {
+                fprintf(stderr, "페이지 쓰기 실패: %d\n", target_ppn);
+                fclose(flashmemoryfp);
+                return EXIT_FAILURE;
+            }
+            writes++;
+        }
+    }
+
+    // 원본 블록 소거
+    if (fdd_erase(pbn) != 1) {
+        fprintf(stderr, "블록 소거 실패: %d\n", pbn);
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
+    erases++;
+
+    // 연산 횟수 출력
+    printf("#reads=%d #writes=%d #erases=%d", reads, writes, erases);
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
