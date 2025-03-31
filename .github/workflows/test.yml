@@ -76,21 +76,21 @@ jobs:
           fi
           # Erase block 0
           ./a.out e flashmemory 0
-          # Read ppn=0, should be erased
+          # 읽지 않은(또는 지워진) 영역은 0xFF로 초기화되어 있어, 읽을 경우 " -1" 결과가 출력되어야 함
           output=$(./a.out r flashmemory 0)
           expected=" -1"
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=0 not erased: expected '$expected', got '$output'"
             exit 1
           fi
-          # Read ppn=8 again, should still be "data8 20"
+          # ppn=8은 블록 1에 해당하므로 영향이 없어야 함
           output=$(./a.out r flashmemory 8)
           expected="data8 20"
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=8 changed: expected '$expected', got '$output'"
             exit 1
           fi
-          # Check another page in block 0, say ppn=1
+          # 블록 0의 다른 페이지(ppn=1)도 확인
           output=$(./a.out r flashmemory 1)
           expected=" -1"
           if [ "$output" != "$expected" ]; then

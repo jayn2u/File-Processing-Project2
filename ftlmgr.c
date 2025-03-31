@@ -164,7 +164,18 @@ int read_pages(char *argv[], char *pagebuf) {
 
     fdd_read(ppn, pagebuf);
 
-    printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
+    int is_erased = 1;
+    for (int i = 0; i < PAGE_SIZE; i++) {
+        if ((unsigned char)pagebuf[i] != 0xFF) {
+            is_erased = 0;
+            break;
+        }
+    }
+    if (is_erased) {
+        printf(" -1\n");
+    } else {
+        printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
+    }
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
