@@ -100,7 +100,7 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
         return EXIT_FAILURE;
     }
 
-    memset(blockbuf, 0xFF, num_blocks * BLOCK_SIZE);
+    memset(blockbuf, (char)0xFF, num_blocks * BLOCK_SIZE);
 
     // 블록 수만큼 파일에 쓰기
     for (int i = 0; i < num_blocks; i++) {
