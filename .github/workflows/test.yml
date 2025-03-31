@@ -34,3 +34,41 @@ jobs:
             echo "Read output mismatch: expected '$expected', got '$output'"
             exit 1
           fi
+
+      - name: Test multiple page writes and reads
+        run: |
+          # Test case 1: ppn 1, sector data "hello", spare data "100"
+          ./a.out w flashmemory 1 "hello" "100"
+          output=$(./a.out r flashmemory 1)
+          expected="hello 100"
+          if [ "$output" != "$expected" ]; then
+            echo "Test case 1 failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+          # Test case 2: ppn 2, sector data "abcde", spare data "0"
+          ./a.out w flashmemory 2 "abcde" "0"
+          output=$(./a.out r flashmemory 2)
+          expected="abcde 0"
+          if [ "$output" != "$expected" ]; then
+            echo "Test case 2 failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+          # Test case 3: ppn 3, sector data "data", spare data "999"
+          ./a.out w flashmemory 3 "data" "999"
+          output=$(./a.out r flashmemory 3)
+          expected="data 999"
+          if [ "$output" != "$expected" ]; then
+            echo "Test case 3 failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+          # Test case 4: ppn 4, sector data "longerTestString", spare data "123456"
+          ./a.out w flashmemory 4 "longerTestString" "123456"
+          output=$(./a.out r flashmemory 4)
+          expected="longerTestString 123456"
+          if [ "$output" != "$expected" ]; then
+            echo "Test case 4 failed: expected '$expected', got '$output'"
+            exit 1
+          fi
