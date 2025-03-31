@@ -2,14 +2,23 @@ name: Project2 CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, rethink ]
   pull_request:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+
+  basic-functionality-test:
+    needs: build  # build job이 완료된 후 실행
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,13 +36,12 @@ jobs:
 
       - name: Test case 1 write hello read 100
         run: |
-          # Test case 1: ppn 1, sector data "hello", spare data "100"
           ./a.out w flashmemory 1 "hello" "100"
           output=$(./a.out r flashmemory 1)
           expected="hello 100"
           if [ "$output" != "$expected" ]; then
-          echo "Test case 1 failed: expected '$expected', got '$output'"
-          exit 1
+            echo "Test case 1 failed: expected '$expected', got '$output'"
+            exit 1
           fi
 
       - name: Test case 2 write abcde read 0
@@ -67,8 +75,7 @@ jobs:
           fi
 
       - name: Test write to block 1 page 0 (ppn=8)
-        run: |
-          ./a.out w flashmemory 8 "data8" "20"
+        run: ./a.out w flashmemory 8 "data8" "20"
 
       - name: Test verify write to ppn=8
         run: |
@@ -79,9 +86,26 @@ jobs:
             exit 1
           fi
 
-      - name: Test erase block 0
+  erase-functionality-test:
+    needs: build  # build job이 완료된 후 실행
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+
+      - name: Setup flash file
+        run: ./a.out c flashmemory 2
+
+      - name: Write data for erase test
         run: |
-          ./a.out e flashmemory 0
+          ./a.out w flashmemory 1 "hello" "100"
+          ./a.out w flashmemory 8 "data8" "20"
+
+      - name: Test erase block 0
+        run: ./a.out e flashmemory 0
 
       - name: Test verify ppn=0 is erased
         run: |
@@ -106,6 +130,57 @@ jobs:
           output=$(./a.out r flashmemory 1)
           expected=""
           if [ "$output" != "$expected" ]; then
-            echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
+          echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
+          exit 1
+          fi
+
+  in-place-update-test:
+    needs: build  # build job이 완료된 후 실행
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+
+      - name: Setup flash file
+        run: ./a.out c flashmemory 2
+
+      - name: Test in-place update - update same page
+        run: |
+          ./a.out w flashmemory 7 "initData" "10"
+          output=$(./a.out u flashmemory 7 "updatedData" "20")
+          echo "In-place update output:" $output
+          result=$(./a.out r flashmemory 7)
+          expected="updatedData 20"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for in-place update on same page: expected '$expected', got '$result'"
+            exit 1
+          fi
+
+      - name: Test in-place update - update different page
+        run: |
+          ./a.out w flashmemory 15 "firstData" "100"
+          output=$(./a.out u flashmemory 15 "secondData" "200")
+          echo "In-place update output:" $output
+          result=$(./a.out r flashmemory 15)
+          expected="secondData 200"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for in-place update on different page: expected '$expected', got '$result'"
+            exit 1
+          fi
+
+      - name: Test in-place update - consecutive updates on same page
+        run: |
+          ./a.out w flashmemory 5 "alpha" "1"
+          output1=$(./a.out u flashmemory 5 "beta" "2")
+          echo "First update output:" $output1
+          output2=$(./a.out u flashmemory 5 "gamma" "3")
+          echo "Second update output:" $output2
+          result=$(./a.out r flashmemory 5)
+          expected="gamma 3"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for consecutive in-place updates: expected '$expected', got '$result'"
             exit 1
           fi
