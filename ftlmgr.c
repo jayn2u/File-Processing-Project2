@@ -28,7 +28,9 @@ int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf)
 //
 int main(int argc, char *argv[]) {
     char sectorbuf[SECTOR_SIZE];
+    memset(sectorbuf, '\0', SECTOR_SIZE);
     char sparebuf[SPARE_SIZE];
+    memset(sparebuf, '\0', SPARE_SIZE);
     char pagebuf[PAGE_SIZE];
     char *blockbuf;
 
@@ -194,8 +196,6 @@ int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
 
     memcpy(sectorbuf, pagebuf, strlen(pagebuf));
     memcpy(sparebuf, pagebuf + SECTOR_SIZE, strlen(pagebuf + SECTOR_SIZE));
-    sectorbuf[strlen(pagebuf)] = '\0';
-    sparebuf[strlen(pagebuf + SECTOR_SIZE)] = '\0';
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
