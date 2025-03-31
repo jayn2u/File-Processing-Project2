@@ -17,6 +17,11 @@ int erase_block(char *argv[]);
 
 int inplace_update(char *argv[], char *blockbuf, char *pagebuf);
 
+int find_target_block(int ppn, int total_blocks_cnt, char *pagebuf);
+
+int is_block_empty(int block_index, char *pagebuf);
+
+int get_total_blocks(const char *filename);
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
 // 읽고 쓰거나 블록을 소거하는 일을 한다 (강의자료 참조).
@@ -31,6 +36,8 @@ int main(int argc, char *argv[]) {
     char sparebuf;
     char pagebuf[PAGE_SIZE];
     char *blockbuf;
+
+    memset(pagebuf, (char)0xFF, PAGE_SIZE);
 
     // flash memory 파일 생성: 위에서 선언한 flashmemoryfp를 사용하여 플래시 메모리 파일을 생성한다. 그 이유는 fdevicedriver.c에서
     //                 flashmemoryfp 파일포인터를 extern으로 선언하여 사용하기 때문이다.
@@ -143,7 +150,6 @@ int write_pages(char *argv[], char *pagebuf) {
     char *sector_start_address = pagebuf;
     char *spare_start_address = sector_start_address + SECTOR_SIZE;
 
-    memset(pagebuf, (char)0xFF, PAGE_SIZE);
     memcpy(sector_start_address, argv[4], strlen(argv[4]));
     memcpy(spare_start_address, argv[5], strlen(argv[5]));
 
@@ -217,7 +223,83 @@ int inplace_update(char *argv[], char *blockbuf, char *pagebuf) {
         return EXIT_FAILURE;
     }
 
+    const int ppn = atoi(argv[3]);
+    const int pbn = ppn / PAGE_NUM;
+
+    if (is_block_empty(pbn, pagebuf)) {
+        printf("[DEBUG] ppn이 들어있는 블록이 비어있습니다.\n");
+    } else {
+        printf("[DEBUG] ppn이 들어있는 블록이 비어있지 않습니다.\n");
+    }
+
+    const int target_block_idx = find_target_block(ppn, get_total_blocks(argv[2]), pagebuf);
+    printf("[DEBUG] Target block_idx : %d", target_block_idx);
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
+}
+
+// argv에서 전달된 ppn 값에 해당하는 블록이 비어있다면 바로 반환하고,
+// 그렇지 않으면 다른 빈 블록을 찾는 함수
+int find_target_block(int ppn, int total_blocks_cnt, char *pagebuf) {
+    int given_block = ppn / PAGE_NUM;
+
+    // 먼저, ppn이 속한 블록이 비어있는지 확인
+    if (is_block_empty(given_block, pagebuf)) {
+        return given_block;
+    }
+
+    // 만약 해당 블록이 비어있지 않다면 다른 빈 블록 탐색 (given_block은 제외)
+    for (int block_index = 0; block_index < total_blocks_cnt; block_index++) {
+        if (block_index == given_block) {
+            continue;
+        }
+        if (is_block_empty(block_index, pagebuf)) {
+            return block_index;
+        }
+    }
+
+    // 빈 블록을 찾지 못한 경우
+    return -1;
+}
+
+// 블록이 비어있는지 검사하는 함수
+// block_index: 검사할 블록 번호, pagebuf: 페이지 데이터 임시 버퍼
+int is_block_empty(int block_index, char *pagebuf) {
+    int block_empty = 1;  // 블록이 비어있다고 가정
+    for (int page_offset = 0; page_offset < PAGE_NUM; page_offset++) {
+        int ppn = block_index * PAGE_NUM + page_offset;
+        if (fdd_read(ppn, pagebuf) == -1) {
+            fprintf(stderr, "페이지 %d 읽기 실패\n", ppn);
+            return 0;  // 오류 발생 시 비어있지 않다고 간주
+        }
+        for (int i = 0; i < PAGE_SIZE; i++) {
+            if ((unsigned char)pagebuf[i] != 0xFF) {
+                return 0;  // 하나라도 초기화되지 않은 데이터가 있으면 비어있지 않음
+            }
+        }
+    }
+    return 1;
+}
+
+int get_total_blocks(const char *filename) {
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        fprintf(stderr, "파일 열기에 실패했습니다: %s\n", filename);
+        return -1; // 오류 처리
+    }
+
+    // 파일의 끝으로 이동 후, 파일 크기를 측정
+    fseek(fp, 0, SEEK_END);
+    long filesize = ftell(fp);
+    fclose(fp);
+
+    // 파일 크기가 BLOCK_SIZE의 배수가 아닌 경우, 경고 혹은 오류 처리 가능
+    if (filesize % BLOCK_SIZE != 0) {
+        fprintf(stderr, "파일 크기가 BLOCK_SIZE의 배수가 아닙니다.\n");
+        return -1;
+    }
+
+    int total_blocks_cnt = filesize / BLOCK_SIZE;
+    return total_blocks_cnt;
 }
