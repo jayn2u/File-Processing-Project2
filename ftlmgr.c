@@ -48,6 +48,7 @@ int main(int argc, char *argv[]) {
                 return EXIT_FAILURE;
             }
             break;
+
         case 'w':
             ret = write_pages(argv, pagebuf);
             if (ret != EXIT_SUCCESS) {
@@ -63,6 +64,7 @@ int main(int argc, char *argv[]) {
                 return EXIT_FAILURE;
             }
             break;
+
         case 'e':
             ret = erase_block(argv);
             if (ret != EXIT_SUCCESS) {
@@ -78,6 +80,7 @@ int main(int argc, char *argv[]) {
                 return EXIT_FAILURE;
             }
             break;
+
         default:
             fprintf(stderr, "옵션을 지정하지 않았습니다.\n");
             return EXIT_FAILURE;
@@ -182,7 +185,6 @@ int read_pages(char *argv[], char *pagebuf) {
         }
     }
     if (is_erased) {
-        // printf(" -1\n"); // TODO: DEBUG용 - CI에서 검수 목적
         return EXIT_SUCCESS;
     }
 
@@ -213,9 +215,6 @@ int inplace_update(char *argv[]) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
-
-    // TODO: 빈공간이 없을 때의 경우 핸들링
-    // TODO: 빈공간을 찾는 알고리즘 설계
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
