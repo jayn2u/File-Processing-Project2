@@ -147,18 +147,6 @@ jobs:
       - name: Setup flash file
         run: ./a.out c flashmemory 2
 
-      - name: Test in-place update - update same page
-        run: |
-          ./a.out w flashmemory 7 "initData" "10"
-          output=$(./a.out u flashmemory 7 "updatedData" "20")
-          echo "In-place update output:" $output
-          result=$(./a.out r flashmemory 7)
-          expected="updatedData 20"
-          if [ "$result" != "$expected" ]; then
-            echo "Test failed for in-place update on same page: expected '$expected', got '$result'"
-            exit 1
-          fi
-
       - name: Test in-place update - update different page
         run: |
           ./a.out w flashmemory 15 "firstData" "100"
@@ -184,3 +172,27 @@ jobs:
             echo "Test failed for consecutive in-place updates: expected '$expected', got '$result'"
             exit 1
           fi
+
+      - name: Test in-place update - update same page
+        run: |
+          ./a.out w flashmemory 7 "initData" "10"
+          output=$(./a.out u flashmemory 7 "updatedData" "20")
+          echo "In-place update output:" $output
+          result=$(./a.out r flashmemory 7)
+          expected="updatedData 20"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for in-place update on same page: expected '$expected', got '$result'"
+            exit 1
+          fi
+
+      - name: Test in-place update preserves original data
+        run: |
+          ./a.out w flashmemory 20 "originalData" "50"
+          output=$(./a.out u flashmemory 20 "newData" "60")
+          result=$(./a.out r flashmemory 20)
+          expected="newData 60"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for in-place update preserve: expected '$expected', got '$result'"
+            exit 1
+          fi
+          grep -q "originalData" flashmemory || (echo "Original data not preserved in flashmemory" && exit 1)
