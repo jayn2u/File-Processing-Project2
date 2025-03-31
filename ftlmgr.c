@@ -164,6 +164,7 @@ int read_pages(char *argv[], char *pagebuf) {
 
     fdd_read(ppn, pagebuf);
 
+    // TODO: 해당 부분이 과제 상 통과가 되는 케이스인지 고민해볼 것
     int is_erased = 1;
     for (int i = 0; i < PAGE_SIZE; i++) {
         if ((unsigned char)pagebuf[i] != 0xFF) {
