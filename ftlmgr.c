@@ -184,7 +184,7 @@ int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
     return EXIT_SUCCESS;
 }
 
-int erase_block(const char *flashfile, int pbn) {
+int erase_block(char *flashfile, int pbn) {
     flashmemoryfp = fopen(flashfile, "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
