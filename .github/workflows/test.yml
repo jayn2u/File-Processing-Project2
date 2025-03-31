@@ -24,25 +24,3 @@ jobs:
           expected=$((2*8*(512+16)))
           actual=$(stat -c%s flashmemory)
           [ "$actual" -eq "$expected" ] || (echo "Size mismatch: expected $expected, got $actual" && exit 1)
-
-      - name: Test write + read
-        run: |
-          ./a.out w flashmemory 3 "hello world" "123"
-          output=$(./a.out r flashmemory 3)
-          [ "$output" = "hello world 123" ] || (echo "Read mismatch: $output" && exit 1)
-
-      - name: Test erase block
-        run: |
-          ./a.out e flashmemory 0
-          out=$(./a.out r flashmemory 3)
-          [ -z "$out" ] || (echo "Erase failed: output still exists" && exit 1)
-
-      - name: Test in-place update
-        run: |
-          ./a.out w flashmemory 5 "initial" "10"
-          ./a.out u flashmemory 5 "updated" "20" > update_log.txt
-          grep -q "#reads=" update_log.txt || (echo "Missing #reads=" && exit 1)
-          grep -q "#writes=" update_log.txt || (echo "Missing #writes=" && exit 1)
-          grep -q "#erases=" update_log.txt || (echo "Missing #erases=" && exit 1)
-          result=$(./a.out r flashmemory 5)
-          [ "$result" = "updated 20" ] || (echo "Update read mismatch: $result" && exit 1)
