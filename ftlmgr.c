@@ -15,7 +15,7 @@ int read_pages(char *argv[], char *pagebuf);
 
 int erase_block(char *argv[]);
 
-int inplace_update(char *argv[]);
+int inplace_update(char *argv[], char *blockbuf, char *pagebuf);
 
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
@@ -27,7 +27,8 @@ int inplace_update(char *argv[]);
 // 스페어영역에 저장되는 정수는 하나이며, 반드시 binary integer 모드로 저장해야 한다.
 //
 int main(int argc, char *argv[]) {
-    char sectorbuf[SECTOR_SIZE];
+    char sectorbuf;
+    char sparebuf;
     char pagebuf[PAGE_SIZE];
     char *blockbuf;
 
@@ -74,7 +75,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'u':
-            ret = inplace_update(argv);
+            ret = inplace_update(argv, blockbuf, pagebuf);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "In-place 업데이트 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
 
 int create_flashmemory_emulator(char *argv[], char *blockbuf) {
     char *flashfile = argv[2];
-    const int num_blocks = atol(argv[3]);
+    const int num_blocks = atoi(argv[3]);
 
     if (num_blocks <= 0) {
         fprintf(stderr, "블록의 수는 0보다 작으면 안됩니다.\n");
@@ -131,64 +132,64 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
 }
 
 int write_pages(char *argv[], char *pagebuf) {
-    flashmemoryfp = fopen(argv[2], "wb");
+    flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
-    int ppn = atol(argv[3]);
-    size_t sector_data_size = strlen(argv[4]);
-    size_t spare_data_size = strlen(argv[5]);
+    int ppn = atoi(argv[3]);
 
-    char *sector_data = malloc(sector_data_size + 1);
-    char *spare_data = malloc(spare_data_size + 1);
+    char *sector_start_address = pagebuf;
+    char *spare_start_address = sector_start_address + SECTOR_SIZE;
 
-    if (sector_data == NULL || spare_data == NULL) {
-        fprintf(stderr, "섹터 데이터와 스페어 데이터 처리 간 문제가 발생했습니다.\n");
-        return EXIT_FAILURE;
-    }
-
-    memcpy(sector_data, argv[4], sector_data_size);
-    memcpy(spare_data, argv[5], spare_data_size);
-
-    memset(pagebuf, 0, PAGE_SIZE);
-    memcpy(pagebuf, sector_data, strlen(sector_data));
-    memcpy(pagebuf + SECTOR_SIZE, spare_data, strlen(spare_data));
-    // printf("[DEBUG] sector_data in pagebuf: %s\n", pagebuf);
-    // printf("[DEBUG] spare_data in pagebuf + SECTOR_SIZE: %s\n", pagebuf + SECTOR_SIZE);
+    memset(pagebuf, (char)0xFF, PAGE_SIZE);
+    memcpy(sector_start_address, argv[4], strlen(argv[4]));
+    memcpy(spare_start_address, argv[5], strlen(argv[5]));
 
     fdd_write(ppn, pagebuf);
 
-    free(sector_data);
-    free(spare_data);
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
 }
 
 int read_pages(char *argv[], char *pagebuf) {
-    flashmemoryfp = fopen(argv[2], "rb");
+    flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
-    int ppn = atol(argv[3]);
-
+    int ppn = atoi(argv[3]);
     fdd_read(ppn, pagebuf);
 
-    int is_erased = 1;
-    for (int i = 0; i < PAGE_SIZE; i++) {
+    // 섹터 영역에서 0xFF가 아닌 바이트만 필터링
+    char nonErasedSector[SECTOR_SIZE + 1];
+    int index = 0;
+    for (int i = 0; i < SECTOR_SIZE; i++) {
         if ((unsigned char) pagebuf[i] != 0xFF) {
-            is_erased = 0;
-            break;
+            nonErasedSector[index++] = pagebuf[i];
         }
     }
-    if (is_erased) {
+    nonErasedSector[index] = '\0';
+
+    // 스페어 영역에서 0xFF가 아닌 바이트만 필터링
+    char nonErasedSpare[SPARE_SIZE + 1];
+    index = 0;
+    for (int i = SECTOR_SIZE; i < PAGE_SIZE; i++) {
+        if ((unsigned char) pagebuf[i] != 0xFF) {
+            nonErasedSpare[index++] = pagebuf[i];
+        }
+    }
+    nonErasedSpare[index] = '\0';
+
+    // 필터링한 결과가 모두 빈 문자열인 경우, 페이지가 초기화된 것으로 판단
+    if (strlen(nonErasedSector) == 0 && strlen(nonErasedSpare) == 0) {
+        fclose(flashmemoryfp);
         return EXIT_SUCCESS;
     }
 
-    printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
+    printf("%s %s\n", nonErasedSector, nonErasedSpare);
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
@@ -201,7 +202,7 @@ int erase_block(char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    const int pbn = atol(argv[3]);
+    const int pbn = atoi(argv[3]);
 
     fdd_erase(pbn);
 
@@ -209,12 +210,13 @@ int erase_block(char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-int inplace_update(char *argv[]) {
+int inplace_update(char *argv[], char *blockbuf, char *pagebuf) {
     flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
+
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
