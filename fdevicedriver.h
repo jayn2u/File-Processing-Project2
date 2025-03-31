@@ -5,9 +5,9 @@
 #ifndef FDEVICEDRIVER_H
 #define FDEVICEDRIVER_H
 
-int fdd_read(int ppn, char* pagebuf);
+int fdd_read(int ppn, char *pagebuf);
 
-int fdd_write(int ppn, char* pagebuf);
+int fdd_write(int ppn, char *pagebuf);
 
 int fdd_erase(int ppn);
 

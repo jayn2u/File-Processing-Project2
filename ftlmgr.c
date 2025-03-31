@@ -11,11 +11,11 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf);
 
 int write_pages(char *argv[], char *pagebuf);
 
-int read_pages(char *argv[], char *pagebuf);
+int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf);
 
 int erase_block(char *argv[]);
 
-int inplace_update(char *argv[]);
+int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf);
 
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
@@ -28,6 +28,7 @@ int inplace_update(char *argv[]);
 //
 int main(int argc, char *argv[]) {
     char sectorbuf[SECTOR_SIZE];
+    char sparebuf[SPARE_SIZE];
     char pagebuf[PAGE_SIZE];
     char *blockbuf;
 
@@ -38,7 +39,7 @@ int main(int argc, char *argv[]) {
     //                  스페어 데이터를 분리해 낸다
     // memset(), memcpy() 등의 함수를 이용하면 편리하다. 물론, 다른 방법으로 해결해도 무방하다.
 
-    int ret;
+    int ret = 0;
 
     switch (argv[1][0]) {
         case 'c':
@@ -48,6 +49,7 @@ int main(int argc, char *argv[]) {
                 return EXIT_FAILURE;
             }
             break;
+
         case 'w':
             ret = write_pages(argv, pagebuf);
             if (ret != EXIT_SUCCESS) {
@@ -57,12 +59,16 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'r':
-            ret = read_pages(argv, pagebuf);
+            ret = read_pages(argv, pagebuf, sectorbuf, sparebuf);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "페이지 읽기 간 문제 발생\n");
                 return EXIT_FAILURE;
             }
+
+            printf("%s %s\n", sectorbuf, sparebuf);
+
             break;
+
         case 'e':
             ret = erase_block(argv);
             if (ret != EXIT_SUCCESS) {
@@ -72,12 +78,13 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'u':
-            ret = inplace_update(argv);
+            ret = inplace_update(argv, pagebuf, sectorbuf, sparebuf);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "In-place 업데이트 간 문제 발생\n");
                 return EXIT_FAILURE;
             }
             break;
+
         default:
             fprintf(stderr, "옵션을 지정하지 않았습니다.\n");
             return EXIT_FAILURE;
@@ -105,7 +112,7 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
     // 각 블록을 0xFF로 초기화
     blockbuf = (char *) malloc(num_blocks * BLOCK_SIZE);
     if (blockbuf == NULL) {
-        fprintf(stderr, "블록퍼퍼 생성에 실패했습니다.\n");
+        fprintf(stderr, "블록버퍼 생성에 실패했습니다.\n");
         fclose(flashmemoryfp);
         return EXIT_FAILURE;
     }
@@ -163,7 +170,7 @@ int write_pages(char *argv[], char *pagebuf) {
     return EXIT_SUCCESS;
 }
 
-int read_pages(char *argv[], char *pagebuf) {
+int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
     flashmemoryfp = fopen(argv[2], "rb");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
@@ -182,11 +189,11 @@ int read_pages(char *argv[], char *pagebuf) {
         }
     }
     if (is_erased) {
-        // printf(" -1\n"); // TODO: DEBUG용 - CI에서 검수 목적
         return EXIT_SUCCESS;
     }
 
-    printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
+    memcpy(sectorbuf, pagebuf, strlen(pagebuf));
+    memcpy(sparebuf, pagebuf + SECTOR_SIZE, strlen(pagebuf + SECTOR_SIZE));
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
@@ -207,15 +214,28 @@ int erase_block(char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-int inplace_update(char *argv[]) {
+int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf) {
     flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
-    // TODO: 빈공간이 없을 때의 경우 핸들링
-    // TODO: 빈공간을 찾는 알고리즘 설계
+    int ret = 0;
+
+    ret = read_pages(argv, pagebuf, sectorbuf, sparebuf);
+    if (ret != EXIT_SUCCESS) {
+        fprintf(stderr, "In-place 업데이트 중 페이지 읽기 간 문제가 발생했습니다.\n");
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
+
+    ret = write_pages(argv, pagebuf);
+    if (ret != EXIT_SUCCESS) {
+        fprintf(stderr, "In-place 업데이트 중 페이지 쓰기 간 문제가 발생했습니다.\n");
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
