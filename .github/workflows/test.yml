@@ -32,8 +32,8 @@ jobs:
           output=$(./a.out r flashmemory 1)
           expected="hello 100"
           if [ "$output" != "$expected" ]; then
-          echo "Test case 1 failed: expected '$expected', got '$output'"
-          exit 1
+            echo "Test case 1 failed: expected '$expected', got '$output'"
+            exit 1
           fi
 
       - name: Test case 2 write abcde read 0
@@ -67,8 +67,7 @@ jobs:
           fi
 
       - name: Test write to block 1 page 0 (ppn=8)
-        run: |
-          ./a.out w flashmemory 8 "data8" "20"
+        run: ./a.out w flashmemory 8 "data8" "20"
 
       - name: Test verify write to ppn=8
         run: |
@@ -80,8 +79,7 @@ jobs:
           fi
 
       - name: Test erase block 0
-        run: |
-          ./a.out e flashmemory 0
+        run: ./a.out e flashmemory 0
 
       - name: Test verify ppn=0 is erased
         run: |
@@ -107,5 +105,61 @@ jobs:
           expected=""
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+      # --- In-place Update Tests ---
+      - name: Test in-place update - update same page
+        run: |
+          # Write initial data to page 7 (block 0)
+          ./a.out w flashmemory 7 "initData" "10"
+          
+          # Perform in-place update on page 7
+          output=$(./a.out u flashmemory 7 "updatedData" "20")
+          echo "In-place update output:" $output
+          
+          # Verify that page 7 now contains the updated data
+          result=$(./a.out r flashmemory 7)
+          expected="updatedData 20"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for in-place update on same page: expected '$expected', got '$result'"
+            exit 1
+          fi
+
+      - name: Test in-place update - update different page
+        run: |
+          # Write initial data to page 15 (block 1; page 15 is in a different block than page 7)
+          ./a.out w flashmemory 15 "firstData" "100"
+          
+          # Perform in-place update on page 15
+          output=$(./a.out u flashmemory 15 "secondData" "200")
+          echo "In-place update output:" $output
+          
+          # Verify that page 15 now contains the updated data
+          result=$(./a.out r flashmemory 15)
+          expected="secondData 200"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for in-place update on different page: expected '$expected', got '$result'"
+            exit 1
+          fi
+
+      - name: Test in-place update - consecutive updates on same page
+        run: |
+          # Write initial data to page 5
+          ./a.out w flashmemory 5 "alpha" "1"
+          
+          # First in-place update on page 5
+          output1=$(./a.out u flashmemory 5 "beta" "2")
+          echo "First update output:" $output1
+          
+          # Second in-place update on the same page
+          output2=$(./a.out u flashmemory 5 "gamma" "3")
+          echo "Second update output:" $output2
+          
+          # Verify that page 5 now contains the result of the consecutive update
+          result=$(./a.out r flashmemory 5)
+          expected="gamma 3"
+          if [ "$result" != "$expected" ]; then
+            echo "Test failed for consecutive in-place updates: expected '$expected', got '$result'"
             exit 1
           fi
