@@ -11,6 +11,8 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf);
 
 int write_pages(char *argv[], char *pagebuf);
 
+int read_pages(char *argv[], char *pagebuf);
+
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
 // 읽고 쓰거나 블록을 소거하는 일을 한다 (강의자료 참조).
@@ -46,6 +48,14 @@ int main(int argc, char *argv[]) {
             ret = write_pages(argv, pagebuf);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "페이지 쓰기 간 문제 발생\n");
+                return EXIT_FAILURE;
+            }
+            break;
+
+        case 'r':
+            ret = read_pages(argv, pagebuf);
+            if (ret != EXIT_SUCCESS) {
+                fprintf(stderr, "페이지 읽기 간 문제 발생\n");
                 return EXIT_FAILURE;
             }
             break;
@@ -99,7 +109,7 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
 }
 
 int write_pages(char *argv[], char *pagebuf) {
-    flashmemoryfp = fopen(argv[2], "r+b");
+    flashmemoryfp = fopen(argv[2], "wb");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
@@ -129,6 +139,23 @@ int write_pages(char *argv[], char *pagebuf) {
 
     free(sector_data);
     free(spare_data);
+    fclose(flashmemoryfp);
+    return EXIT_SUCCESS;
+}
+
+int read_pages(char *argv[], char *pagebuf) {
+    flashmemoryfp = fopen(argv[2], "rb");
+    if (flashmemoryfp == NULL) {
+        fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
+        return EXIT_FAILURE;
+    }
+
+    int ppn = atol(argv[3]);
+
+    fdd_read(ppn, pagebuf);
+
+    printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
+
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
 }
