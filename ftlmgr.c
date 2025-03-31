@@ -7,7 +7,7 @@
 
 FILE *flashmemoryfp; // fdevicedriver.c에서 사용
 
-int create_flashmemory_emulator(char *argv[], char *blockbuf);
+int create_flashmemory_emulator(char *filename, char *blockbuf, int block_num);
 
 int write_pages(char *argv[], char *pagebuf);
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
 
     switch (argv[1][0]) {
         case 'c':
-            ret = create_flashmemory_emulator(argv, blockbuf);
+            ret = create_flashmemory_emulator(argv[2], blockbuf, atoi(argv[3]));
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "플래시 메모리 생성 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -95,9 +95,9 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-int create_flashmemory_emulator(char *argv[], char *blockbuf) {
-    char *flashfile = argv[2];
-    const int num_blocks = atol(argv[3]);
+int create_flashmemory_emulator(char *filename, char *blockbuf, int block_num) {
+    char *flashfile = filename;
+    const int num_blocks = block_num;
 
     if (num_blocks <= 0) {
         fprintf(stderr, "블록의 수는 0보다 작으면 안됩니다.\n");
@@ -232,6 +232,9 @@ int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf)
         return EXIT_FAILURE;
     }
 
+
+
+    // 새로 입력받은 데이터로 업데이트
     ret = write_pages(argv, pagebuf);
     if (ret != EXIT_SUCCESS) {
         fprintf(stderr, "In-place 업데이트 중 페이지 쓰기 간 문제가 발생했습니다.\n");
