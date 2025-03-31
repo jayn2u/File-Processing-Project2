@@ -27,16 +27,6 @@ jobs:
 
       - name: Test page write and read
         run: |
-          ./a.out w flashmemory 0 "testdata" "42"
-          output=$(./a.out r flashmemory 0)
-          expected="testdata 42"
-          if [ "$output" != "$expected" ]; then
-            echo "Read output mismatch: expected '$expected', got '$output'"
-            exit 1
-          fi
-
-      - name: Test multiple page writes and reads
-        run: |
           # Test case 1: ppn 1, sector data "hello", spare data "100"
           ./a.out w flashmemory 1 "hello" "100"
           output=$(./a.out r flashmemory 1)
@@ -70,5 +60,40 @@ jobs:
           expected="longerTestString 123456"
           if [ "$output" != "$expected" ]; then
             echo "Test case 4 failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+      - name: Test block erase
+        run: |
+          # Write to ppn=8 in block 1
+          ./a.out w flashmemory 8 "data8" "20"
+          # Read ppn=8 to confirm
+          output=$(./a.out r flashmemory 8)
+          expected="data8 20"
+          if [ "$output" != "$expected" ]; then
+            echo "Write to ppn=8 failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+          # Erase block 0
+          ./a.out e flashmemory 0
+          # Read ppn=0, should be erased
+          output=$(./a.out r flashmemory 0)
+          expected=" -1"
+          if [ "$output" != "$expected" ]; then
+            echo "After erase, ppn=0 not erased: expected '$expected', got '$output'"
+            exit 1
+          fi
+          # Read ppn=8 again, should still be "data8 20"
+          output=$(./a.out r flashmemory 8)
+          expected="data8 20"
+          if [ "$output" != "$expected" ]; then
+            echo "After erase, ppn=8 changed: expected '$expected', got '$output'"
+            exit 1
+          fi
+          # Check another page in block 0, say ppn=1
+          output=$(./a.out r flashmemory 1)
+          expected=" -1"
+          if [ "$output" != "$expected" ]; then
+            echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
             exit 1
           fi
