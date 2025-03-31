@@ -6,6 +6,8 @@
 
 FILE *flashmemoryfp; // fdevicedriver.c에서 사용
 
+int create_flashmemory(char* argv[], char* blockbuf);
+
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
 // 읽고 쓰거나 블록을 소거하는 일을 한다 (강의자료 참조).
@@ -27,16 +29,25 @@ int main(int argc, char *argv[]) {
 	//                  스페어 데이터를 분리해 낸다
 	// memset(), memcpy() 등의 함수를 이용하면 편리하다. 물론, 다른 방법으로 해결해도 무방하다.
 
-	if (argc != 4) {
-		printf("사용법: %s c <flashfile> <#blocks>\n", argv[0]);
-		return EXIT_FAILURE;
+	int ret;
+
+	switch (argv[1][0]) {
+		case 'c':
+			ret = create_flashmemory(argv, blockbuf);
+			if (ret != EXIT_SUCCESS) {
+				fprintf(stderr, "플래시 메모리 생성 간 문제 발생\n");
+				return EXIT_FAILURE;
+			}
+			break;
+		default:
+			fprintf(stderr, "옵션을 지정하지 않았습니다.\n");
+			return EXIT_FAILURE;
 	}
 
-	if (argv[1][0] != 'c') {
-		printf("잘못된 명령어입니다. 플래시 메모리를 생성하기 위해서는 옵션 'c'를 사용하세요.\n");
-		return EXIT_FAILURE;
-	}
+	return EXIT_SUCCESS;
+}
 
+int create_flashmemory(char* argv[], char* blockbuf) {
 	char *flashfile = argv[2];
 	const int num_blocks = atol(argv[3]);
 
