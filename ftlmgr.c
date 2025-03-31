@@ -22,6 +22,7 @@ int find_target_block(int ppn, int total_blocks_cnt, char *pagebuf);
 int is_block_empty(int block_index, char *pagebuf);
 
 int get_total_blocks(const char *filename);
+
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
 // 읽고 쓰거나 블록을 소거하는 일을 한다 (강의자료 참조).
@@ -217,91 +218,33 @@ int erase_block(char *argv[]) {
 }
 
 int inplace_update(char *argv[], char *pagebuf) {
-    // 플래시 메모리 파일 열기
     flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
-    // 업데이트 대상 페이지 및 블록 번호 계산
     int ppn = atoi(argv[3]);
     int pbn = ppn / PAGE_NUM;
-
-    // 새로운 데이터 추출
+    int offset = ppn % PAGE_NUM;
     char *new_sector = argv[4];
     char *new_spare = argv[5];
 
-    // 만약 블록이 비어있다면 단순 쓰기 처리
-    if (is_block_empty(pbn, pagebuf)) {
-        char new_page[PAGE_SIZE];
-        memset(new_page, 0xFF, PAGE_SIZE);
-        int len = strlen(new_sector);
-        if (len > SECTOR_SIZE) len = SECTOR_SIZE;
-        memcpy(new_page, new_sector, len);
-        int spare_len = strlen(new_spare);
-        if (spare_len > SPARE_SIZE) spare_len = SPARE_SIZE;
-        memcpy(new_page + SECTOR_SIZE, new_spare, spare_len);
-
-        if (fdd_write(ppn, new_page) != 1) {
-            fprintf(stderr, "페이지 쓰기 실패: %d\n", ppn);
+    // 블록의 모든 페이지를 메모리에 읽기
+    char block_pages[PAGE_NUM][PAGE_SIZE];
+    int reads = 0;
+    for (int i = 0; i < PAGE_NUM; i++) {
+        int current_ppn = pbn * PAGE_NUM + i;
+        if (fdd_read(current_ppn, block_pages[i]) != 1) {
+            fprintf(stderr, "페이지 읽기 실패: %d\n", current_ppn);
             fclose(flashmemoryfp);
             return EXIT_FAILURE;
         }
-        printf("#reads=0 #writes=1 #erases=0");
-        fclose(flashmemoryfp);
-        return EXIT_SUCCESS;
+        reads++;
     }
 
-    // in-place update를 위한 빈 블록 검색
-    int total_blocks = get_total_blocks(argv[2]);
-    int target_block = find_target_block(ppn, total_blocks, pagebuf);
-    if (target_block < 0) {
-        fprintf(stderr, "빈 블록을 찾을 수 없음.\n");
-        fclose(flashmemoryfp);
-        return EXIT_FAILURE;
-    }
-
-    int reads = 0, writes = 0, erases = 0;
-    char temp_page[PAGE_SIZE];
-
-    // 원본 블록의 모든 페이지를 빈 블록으로 복사 (업데이트 페이지는 새 데이터로 기록)
-    for (int offset = 0; offset < PAGE_NUM; offset++) {
-        int source_ppn = pbn * PAGE_NUM + offset;
-        int target_ppn = target_block * PAGE_NUM + offset;
-
-        if (source_ppn == ppn) { // 업데이트 대상 페이지
-            memset(temp_page, 0xFF, PAGE_SIZE);
-            int len = strlen(new_sector);
-            if (len > SECTOR_SIZE) len = SECTOR_SIZE;
-            memcpy(temp_page, new_sector, len);
-            int spare_len = strlen(new_spare);
-            if (spare_len > SPARE_SIZE) spare_len = SPARE_SIZE;
-            memcpy(temp_page + SECTOR_SIZE, new_spare, spare_len);
-
-            if (fdd_write(target_ppn, temp_page) != 1) {
-                fprintf(stderr, "업데이트 페이지 쓰기 실패: %d\n", target_ppn);
-                fclose(flashmemoryfp);
-                return EXIT_FAILURE;
-            }
-            writes++;
-        } else { // 그대로 복사하는 페이지
-            if (fdd_read(source_ppn, temp_page) != 1) {
-                fprintf(stderr, "페이지 읽기 실패: %d\n", source_ppn);
-                fclose(flashmemoryfp);
-                return EXIT_FAILURE;
-            }
-            reads++;
-            if (fdd_write(target_ppn, temp_page) != 1) {
-                fprintf(stderr, "페이지 쓰기 실패: %d\n", target_ppn);
-                fclose(flashmemoryfp);
-                return EXIT_FAILURE;
-            }
-            writes++;
-        }
-    }
-
-    // 원본 블록 소거
+    // 블록 지우기
+    int erases = 0;
     if (fdd_erase(pbn) != 1) {
         fprintf(stderr, "블록 소거 실패: %d\n", pbn);
         fclose(flashmemoryfp);
@@ -309,9 +252,37 @@ int inplace_update(char *argv[], char *pagebuf) {
     }
     erases++;
 
-    // 연산 횟수 출력
-    printf("#reads=%d #writes=%d #erases=%d", reads, writes, erases);
+    // 업데이트된 페이지 준비
+    char updated_page[PAGE_SIZE];
+    memset(updated_page, 0xFF, PAGE_SIZE);
+    int len = strlen(new_sector);
+    if (len > SECTOR_SIZE) len = SECTOR_SIZE;
+    memcpy(updated_page, new_sector, len);
+    int spare_len = strlen(new_spare);
+    if (spare_len > SPARE_SIZE) spare_len = SPARE_SIZE;
+    memcpy(updated_page + SECTOR_SIZE, new_spare, spare_len);
 
+    // 모든 페이지를 원래 위치에 쓰기
+    int writes = 0;
+    for (int i = 0; i < PAGE_NUM; i++) {
+        int current_ppn = pbn * PAGE_NUM + i;
+        if (i == offset) {
+            if (fdd_write(current_ppn, updated_page) != 1) {
+                fprintf(stderr, "업데이트 페이지 쓰기 실패: %d\n", current_ppn);
+                fclose(flashmemoryfp);
+                return EXIT_FAILURE;
+            }
+        } else {
+            if (fdd_write(current_ppn, block_pages[i]) != 1) {
+                fprintf(stderr, "페이지 쓰기 실패: %d\n", current_ppn);
+                fclose(flashmemoryfp);
+                return EXIT_FAILURE;
+            }
+        }
+        writes++;
+    }
+
+    printf("#reads=%d #writes=%d #erases=%d", reads, writes, erases);
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
 }
@@ -343,16 +314,16 @@ int find_target_block(int ppn, int total_blocks_cnt, char *pagebuf) {
 // 블록이 비어있는지 검사하는 함수
 // block_index: 검사할 블록 번호, pagebuf: 페이지 데이터 임시 버퍼
 int is_block_empty(int block_index, char *pagebuf) {
-    int block_empty = 1;  // 블록이 비어있다고 가정
+    int block_empty = 1; // 블록이 비어있다고 가정
     for (int page_offset = 0; page_offset < PAGE_NUM; page_offset++) {
         int ppn = block_index * PAGE_NUM + page_offset;
         if (fdd_read(ppn, pagebuf) == -1) {
             fprintf(stderr, "페이지 %d 읽기 실패\n", ppn);
-            return 0;  // 오류 발생 시 비어있지 않다고 간주
+            return 0; // 오류 발생 시 비어있지 않다고 간주
         }
         for (int i = 0; i < PAGE_SIZE; i++) {
-            if ((unsigned char)pagebuf[i] != 0xFF) {
-                return 0;  // 하나라도 초기화되지 않은 데이터가 있으면 비어있지 않음
+            if ((unsigned char) pagebuf[i] != 0xFF) {
+                return 0; // 하나라도 초기화되지 않은 데이터가 있으면 비어있지 않음
             }
         }
     }
