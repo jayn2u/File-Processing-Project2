@@ -62,6 +62,11 @@ int main(int argc, char *argv[]) {
             }
             break;
         case 'e':
+            ret = erase_block(argv);
+            if (ret != EXIT_SUCCESS) {
+                fprintf(stderr, "블록 소거 간 문제 발생\n");
+                return EXIT_FAILURE;
+            }
             break;
         default:
             fprintf(stderr, "옵션을 지정하지 않았습니다.\n");
@@ -166,7 +171,7 @@ int read_pages(char *argv[], char *pagebuf) {
 }
 
 int erase_block(char *argv[]) {
-    flashmemoryfp = fopen(argv[2], "wb");
+    flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
