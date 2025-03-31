@@ -25,18 +25,19 @@ jobs:
           actual=$(stat -c%s flashmemory)
           [ "$actual" -eq "$expected" ] || (echo "Size mismatch: expected $expected, got $actual" && exit 1)
 
-      - name: Test page write and read
+      - name: Test case 1 write hello read 100
         run: |
           # Test case 1: ppn 1, sector data "hello", spare data "100"
           ./a.out w flashmemory 1 "hello" "100"
           output=$(./a.out r flashmemory 1)
           expected="hello 100"
           if [ "$output" != "$expected" ]; then
-            echo "Test case 1 failed: expected '$expected', got '$output'"
-            exit 1
+          echo "Test case 1 failed: expected '$expected', got '$output'"
+          exit 1
           fi
 
-          # Test case 2: ppn 2, sector data "abcde", spare data "0"
+      - name: Test case 2 write abcde read 0
+        run: |
           ./a.out w flashmemory 2 "abcde" "0"
           output=$(./a.out r flashmemory 2)
           expected="abcde 0"
@@ -45,7 +46,8 @@ jobs:
             exit 1
           fi
 
-          # Test case 3: ppn 3, sector data "data", spare data "999"
+      - name: Test case 3 write data read 999
+        run: |
           ./a.out w flashmemory 3 "data" "999"
           output=$(./a.out r flashmemory 3)
           expected="data 999"
@@ -54,7 +56,8 @@ jobs:
             exit 1
           fi
 
-          # Test case 4: ppn 4, sector data "longerTestString", spare data "123456"
+      - name: Test case 4 write longerTestString read 123456
+        run: |
           ./a.out w flashmemory 4 "longerTestString" "123456"
           output=$(./a.out r flashmemory 4)
           expected="longerTestString 123456"
@@ -63,34 +66,43 @@ jobs:
             exit 1
           fi
 
-      - name: Test block erase
+      - name: Test write to block 1 page 0 (ppn=8)
         run: |
-          # Write to ppn=8 in block 1
           ./a.out w flashmemory 8 "data8" "20"
-          # Read ppn=8 to confirm
+
+      - name: Test verify write to ppn=8
+        run: |
           output=$(./a.out r flashmemory 8)
           expected="data8 20"
           if [ "$output" != "$expected" ]; then
             echo "Write to ppn=8 failed: expected '$expected', got '$output'"
             exit 1
           fi
-          # Erase block 0
+
+      - name: Test erase block 0
+        run: |
           ./a.out e flashmemory 0
-          # 읽지 않은(또는 지워진) 영역은 0xFF로 초기화되어 있어, 읽을 경우 " -1" 결과가 출력되어야 함
+
+      - name: Test verify ppn=0 is erased
+        run: |
           output=$(./a.out r flashmemory 0)
           expected=""
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=0 not erased: expected '$expected', got '$output'"
             exit 1
           fi
-          # ppn=8은 블록 1에 해당하므로 영향이 없어야 함
+
+      - name: Test verify ppn=8 is preserved after block 0 erase
+        run: |
           output=$(./a.out r flashmemory 8)
           expected="data8 20"
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=8 changed: expected '$expected', got '$output'"
             exit 1
           fi
-          # 블록 0의 다른 페이지(ppn=1)도 확인
+
+      - name: Test verify ppn=1 is erased
+        run: |
           output=$(./a.out r flashmemory 1)
           expected=""
           if [ "$output" != "$expected" ]; then
