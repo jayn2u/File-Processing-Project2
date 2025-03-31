@@ -9,7 +9,7 @@ FILE *flashmemoryfp; // fdevicedriver.c에서 사용
 
 int create_flashmemory_emulator(char *filename, char *blockbuf, int block_num);
 
-int write_pages(char *argv[], char *pagebuf);
+int write_pages(char *pagebuf, char *flashfile, int ppn, const char *sectordata, const char *sparedata);
 
 int read_pages(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf);
 
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
             break;
 
         case 'w':
-            ret = write_pages(argv, pagebuf);
+            ret = write_pages(pagebuf, argv[2], atoi(argv[3]), argv[4], argv[5]);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "페이지 쓰기 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -136,38 +136,21 @@ int create_flashmemory_emulator(char *filename, char *blockbuf, int block_num) {
     return EXIT_SUCCESS;
 }
 
-int write_pages(char *argv[], char *pagebuf) {
-    flashmemoryfp = fopen(argv[2], "wb");
+int write_pages(char *pagebuf, char *flashfile, int ppn, const char *sectordata, const char *sparedata) {
+    flashmemoryfp = fopen(flashfile, "wb");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
-    int ppn = atol(argv[3]);
-    size_t sector_data_size = strlen(argv[4]);
-    size_t spare_data_size = strlen(argv[5]);
-
-    char *sector_data = malloc(sector_data_size + 1);
-    char *spare_data = malloc(spare_data_size + 1);
-
-    if (sector_data == NULL || spare_data == NULL) {
-        fprintf(stderr, "섹터 데이터와 스페어 데이터 처리 간 문제가 발생했습니다.\n");
-        return EXIT_FAILURE;
-    }
-
-    memcpy(sector_data, argv[4], sector_data_size);
-    memcpy(spare_data, argv[5], spare_data_size);
-
     memset(pagebuf, 0, PAGE_SIZE);
-    memcpy(pagebuf, sector_data, strlen(sector_data));
-    memcpy(pagebuf + SECTOR_SIZE, spare_data, strlen(spare_data));
+    memcpy(pagebuf, sectordata, strlen(sectordata));
+    memcpy(pagebuf + SECTOR_SIZE, sparedata, strlen(sparedata));
     // printf("[DEBUG] sector_data in pagebuf: %s\n", pagebuf);
     // printf("[DEBUG] spare_data in pagebuf + SECTOR_SIZE: %s\n", pagebuf + SECTOR_SIZE);
 
     fdd_write(ppn, pagebuf);
 
-    free(sector_data);
-    free(spare_data);
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
 }
@@ -232,10 +215,8 @@ int inplace_update(char *argv[], char *pagebuf, char *sectorbuf, char *sparebuf)
         return EXIT_FAILURE;
     }
 
-
-
     // 새로 입력받은 데이터로 업데이트
-    ret = write_pages(argv, pagebuf);
+    ret = write_pages(pagebuf, argv[2], atoi(argv[3]), argv[4], argv[5]);
     if (ret != EXIT_SUCCESS) {
         fprintf(stderr, "In-place 업데이트 중 페이지 쓰기 간 문제가 발생했습니다.\n");
         fclose(flashmemoryfp);
