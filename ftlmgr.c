@@ -133,8 +133,8 @@ int write_pages(char *argv[], char *pagebuf) {
     memset(pagebuf, 0, PAGE_SIZE);
     memcpy(pagebuf, sector_data, strlen(sector_data));
     memcpy(pagebuf + SECTOR_SIZE, spare_data, strlen(spare_data));
-    printf("[DEBUG] sector_data in pagebuf: %s\n", pagebuf);
-    printf("[DEBUG] spare_data in pagebuf + SECTOR_SIZE: %s\n", pagebuf + SECTOR_SIZE);
+    // printf("[DEBUG] sector_data in pagebuf: %s\n", pagebuf);
+    // printf("[DEBUG] spare_data in pagebuf + SECTOR_SIZE: %s\n", pagebuf + SECTOR_SIZE);
 
     fdd_write(ppn, pagebuf);
 
