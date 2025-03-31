@@ -78,7 +78,7 @@ jobs:
           ./a.out e flashmemory 0
           # 읽지 않은(또는 지워진) 영역은 0xFF로 초기화되어 있어, 읽을 경우 " -1" 결과가 출력되어야 함
           output=$(./a.out r flashmemory 0)
-          expected=" -1"
+          expected=""
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=0 not erased: expected '$expected', got '$output'"
             exit 1
@@ -92,7 +92,7 @@ jobs:
           fi
           # 블록 0의 다른 페이지(ppn=1)도 확인
           output=$(./a.out r flashmemory 1)
-          expected=" -1"
+          expected=""
           if [ "$output" != "$expected" ]; then
             echo "After erase, ppn=1 not erased: expected '$expected', got '$output'"
             exit 1

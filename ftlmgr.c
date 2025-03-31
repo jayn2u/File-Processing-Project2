@@ -15,6 +15,8 @@ int read_pages(char *argv[], char *pagebuf);
 
 int erase_block(char *argv[]);
 
+int inplace_update(char *argv[]);
+
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
 // 읽고 쓰거나 블록을 소거하는 일을 한다 (강의자료 참조).
@@ -65,6 +67,14 @@ int main(int argc, char *argv[]) {
             ret = erase_block(argv);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "블록 소거 간 문제 발생\n");
+                return EXIT_FAILURE;
+            }
+            break;
+
+        case 'u':
+            ret = inplace_update(argv);
+            if (ret != EXIT_SUCCESS) {
+                fprintf(stderr, "In-place 업데이트 간 문제 발생\n");
                 return EXIT_FAILURE;
             }
             break;
@@ -164,19 +174,19 @@ int read_pages(char *argv[], char *pagebuf) {
 
     fdd_read(ppn, pagebuf);
 
-    // TODO: 해당 부분이 과제 상 통과가 되는 케이스인지 고민해볼 것
     int is_erased = 1;
     for (int i = 0; i < PAGE_SIZE; i++) {
-        if ((unsigned char)pagebuf[i] != 0xFF) {
+        if ((unsigned char) pagebuf[i] != 0xFF) {
             is_erased = 0;
             break;
         }
     }
     if (is_erased) {
-        printf(" -1\n");
-    } else {
-        printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
+        // printf(" -1\n"); // TODO: DEBUG용 - CI에서 검수 목적
+        return EXIT_SUCCESS;
     }
+
+    printf("%s %s\n", pagebuf, pagebuf + SECTOR_SIZE);
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
@@ -192,6 +202,20 @@ int erase_block(char *argv[]) {
     const int pbn = atol(argv[3]);
 
     fdd_erase(pbn);
+
+    fclose(flashmemoryfp);
+    return EXIT_SUCCESS;
+}
+
+int inplace_update(char *argv[]) {
+    flashmemoryfp = fopen(argv[2], "rb+");
+    if (flashmemoryfp == NULL) {
+        fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
+        return EXIT_FAILURE;
+    }
+
+    // TODO: 빈공간이 없을 때의 경우 핸들링
+    // TODO: 빈공간을 찾는 알고리즘 설계
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
