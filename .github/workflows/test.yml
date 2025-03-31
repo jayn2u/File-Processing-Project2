@@ -24,3 +24,13 @@ jobs:
           expected=$((2*8*(512+16)))
           actual=$(stat -c%s flashmemory)
           [ "$actual" -eq "$expected" ] || (echo "Size mismatch: expected $expected, got $actual" && exit 1)
+
+      - name: Test page write and read
+        run: |
+          ./a.out w flashmemory 0 "testdata" "42"
+          output=$(./a.out r flashmemory 0)
+          expected="testdata 42"
+          if [ "$output" != "$expected" ]; then
+            echo "Read output mismatch: expected '$expected', got '$output'"
+            exit 1
+          fi
