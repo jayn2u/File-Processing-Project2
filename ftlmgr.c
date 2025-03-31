@@ -2,13 +2,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include "flash.h"
+#include "fdevicedriver.h"
 // 필요한 경우 헤더파일을 추가한다
 
 FILE *flashmemoryfp; // fdevicedriver.c에서 사용
 
 int create_flashmemory_emulator(char *argv[], char *blockbuf);
 
-int write_pages();
+int write_pages(char *argv[], char *pagebuf);
 
 //
 // 이 함수는 FTL의 역할 중 일부분을 수행하는데 물리적인 저장장치 flash memory에 Flash device driver를 이용하여 데이터를
@@ -42,7 +43,7 @@ int main(int argc, char *argv[]) {
             }
             break;
         case 'w':
-            ret = write_pages();
+            ret = write_pages(argv, pagebuf);
             if (ret != EXIT_SUCCESS) {
                 fprintf(stderr, "페이지 쓰기 간 문제 발생\n");
                 return EXIT_FAILURE;
@@ -61,21 +62,21 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
     const int num_blocks = atol(argv[3]);
 
     if (num_blocks <= 0) {
-        printf("블록의 수는 0보다 작으면 안됩니다.\n");
+        fprintf(stderr, "블록의 수는 0보다 작으면 안됩니다.\n");
         return EXIT_FAILURE;
     }
 
     // Flash memory 파일 생성
     flashmemoryfp = fopen(flashfile, "wb");
     if (flashmemoryfp == NULL) {
-        printf("Failed to create flash memory file.\n");
+        fprintf(stderr, "플래시메모리 파일 생성에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
     // 각 블록을 0xFF로 초기화
     blockbuf = (char *) malloc(num_blocks * BLOCK_SIZE);
     if (blockbuf == NULL) {
-        printf("블록퍼퍼 생성에 실패했습니다.\n");
+        fprintf(stderr, "블록퍼퍼 생성에 실패했습니다.\n");
         fclose(flashmemoryfp);
         return EXIT_FAILURE;
     }
@@ -85,7 +86,7 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
     // 블록 수만큼 파일에 쓰기
     for (int i = 0; i < num_blocks; i++) {
         if (fwrite(blockbuf, BLOCK_SIZE, 1, flashmemoryfp) != 1) {
-            printf("%d 블록에 초기화 실패했습니다.\n", i);
+            fprintf(stderr, "%d 블록에 초기화 실패했습니다.\n", i);
             free(blockbuf);
             fclose(flashmemoryfp);
             return EXIT_FAILURE;
@@ -97,6 +98,37 @@ int create_flashmemory_emulator(char *argv[], char *blockbuf) {
     return EXIT_SUCCESS;
 }
 
-int write_pages() {
+int write_pages(char *argv[], char *pagebuf) {
+    flashmemoryfp = fopen(argv[2], "r+b");
+    if (flashmemoryfp == NULL) {
+        fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
+        return EXIT_FAILURE;
+    }
+
+    int ppn = atol(argv[3]);
+    size_t sector_data_size = strlen(argv[4]);
+    size_t spare_data_size = strlen(argv[5]);
+
+    char *sector_data = malloc(sector_data_size + 1);
+    char *spare_data = malloc(spare_data_size + 1);
+
+    if (sector_data == NULL || spare_data == NULL) {
+        fprintf(stderr, "섹터 데이터와 스페어 데이터 처리 간 문제가 발생했습니다.\n");
+        return EXIT_FAILURE;
+    }
+
+    memcpy(sector_data, argv[4], sector_data_size);
+    memcpy(spare_data, argv[5], spare_data_size);
+
+    memcpy(pagebuf, sector_data, strlen(sector_data));
+    memcpy(pagebuf + SECTOR_SIZE, spare_data, strlen(spare_data));
+    printf("[DEBUG] sector_data in pagebuf: %s\n", pagebuf);
+    printf("[DEBUG] spare_data in pagebuf + SECTOR_SIZE: %s\n", pagebuf + SECTOR_SIZE);
+
+    fdd_write(ppn, pagebuf);
+
+    free(sector_data);
+    free(spare_data);
+    fclose(flashmemoryfp);
     return EXIT_SUCCESS;
 }
