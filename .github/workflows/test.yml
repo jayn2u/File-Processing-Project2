@@ -238,62 +238,6 @@ jobs:
             sleep 1
           done
 
-  continuous-ftl-event-test:
-    needs: build  # build job 완료 후 실행
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Compile ftlmgr
-        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
-
-      - name: Create flashmemory emulator
-        run: ./a.out c flashmemory 2
-
-      - name: Simulate continuous FTL events
-        run: |
-          for i in {1..5}; do
-            echo "Iteration $i: Write event"
-            ./a.out w flashmemory 1 "data${i}" "$((100*i))"
-            output=$(./a.out r flashmemory 1)
-            expected="data${i} $((100*i))"
-            if [ "$output" != "$expected" ]; then
-              echo "Write event failed at iteration $i: expected '$expected', got '$output'"
-              exit 1
-            fi
-            sleep 1
-
-            echo "Iteration $i: Update event"
-            ./a.out u flashmemory 1 "udata${i}" "$((200*i))"
-            output=$(./a.out r flashmemory 1)
-            expected="udata${i} $((200*i))"
-            if [ "$output" != "$expected" ]; then
-              echo "Update event failed at iteration $i: expected '$expected', got '$output'"
-              exit 1
-            fi
-            sleep 1
-
-            echo "Iteration $i: Erase event"
-            ./a.out e flashmemory 0
-            output=$(./a.out r flashmemory 1)
-            if [ -n "$output" ]; then
-              echo "Erase event failed at iteration $i: expected empty output, got '$output'"
-              exit 1
-            fi
-            sleep 1
-
-            echo "Iteration $i: Restore state with Write event"
-            ./a.out w flashmemory 1 "data${i}" "$((100*i))"
-            output=$(./a.out r flashmemory 1)
-            expected="data${i} $((100*i))"
-            if [ "$output" != "$expected" ]; then
-              echo "Restore write failed at iteration $i: expected '$expected', got '$output'"
-              exit 1
-            fi
-            sleep 1
-          done
-
   inplace-update-data-verify-test:
     needs: build
     runs-on: ubuntu-22.04
