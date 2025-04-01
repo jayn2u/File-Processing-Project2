@@ -184,3 +184,112 @@ jobs:
             echo "Test failed for in-place update on same page: expected '$expected', got '$result'"
             exit 1
           fi
+
+  continuous-read-write-update-test:
+    needs: build  # build job 완료 후 실행
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+
+      - name: Create flashmemory emulator
+        run: |
+          # create_flashmemory_emulator 명령어로 flashmemory emulator 생성 (여기서는 기존의 c 명령어 대신 사용)
+          ./a.out create_flashmemory_emulator flashmemory 2
+
+      - name: Verify initial state (should be empty)
+        run: |
+          output=$(./a.out r flashmemory 1)
+          expected=""
+          if [ "$output" != "$expected" ]; then
+            echo "Initial read failed: expected empty output, got '$output'"
+            exit 1
+          fi
+
+      - name: Write data and verify read
+        run: |
+          ./a.out w flashmemory 1 "hello" "100"
+          output=$(./a.out r flashmemory 1)
+          expected="hello 100"
+          if [ "$output" != "$expected" ]; then
+            echo "Write test failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+      - name: In-place update and verify read
+        run: |
+          ./a.out u flashmemory 1 "updatedHello" "200"
+          output=$(./a.out r flashmemory 1)
+          expected="updatedHello 200"
+          if [ "$output" != "$expected" ]; then
+            echo "In-place update test failed: expected '$expected', got '$output'"
+            exit 1
+          fi
+
+      - name: Continuous read test
+        run: |
+          # 연속적으로 읽어들여 상태 확인
+          for i in {1..3}; do
+            output=$(./a.out r flashmemory 1)
+            echo "Read iteration $i: $output"
+            sleep 1
+          done
+
+  continuous-ftl-event-test:
+    needs: build  # build job 완료 후 실행
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+
+      - name: Create flashmemory emulator
+        run: ./a.out c flashmemory 2
+
+      - name: Simulate continuous FTL events
+        run: |
+          for i in {1..5}; do
+            echo "Iteration $i: Write event"
+            ./a.out w flashmemory 1 "data${i}" "$((100*i))"
+            output=$(./a.out r flashmemory 1)
+            expected="data${i} $((100*i))"
+            if [ "$output" != "$expected" ]; then
+              echo "Write event failed at iteration $i: expected '$expected', got '$output'"
+              exit 1
+            fi
+            sleep 1
+
+            echo "Iteration $i: Update event"
+            ./a.out u flashmemory 1 "udata${i}" "$((200*i))"
+            output=$(./a.out r flashmemory 1)
+            expected="udata${i} $((200*i))"
+            if [ "$output" != "$expected" ]; then
+              echo "Update event failed at iteration $i: expected '$expected', got '$output'"
+              exit 1
+            fi
+            sleep 1
+
+            echo "Iteration $i: Erase event"
+            ./a.out e flashmemory 0
+            output=$(./a.out r flashmemory 1)
+            if [ -n "$output" ]; then
+              echo "Erase event failed at iteration $i: expected empty output, got '$output'"
+              exit 1
+            fi
+            sleep 1
+
+            echo "Iteration $i: Restore state with Write event"
+            ./a.out w flashmemory 1 "data${i}" "$((100*i))"
+            output=$(./a.out r flashmemory 1)
+            expected="data${i} $((100*i))"
+            if [ "$output" != "$expected" ]; then
+              echo "Restore write failed at iteration $i: expected '$expected', got '$output'"
+              exit 1
+            fi
+            sleep 1
+          done
