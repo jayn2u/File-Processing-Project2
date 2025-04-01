@@ -152,7 +152,8 @@ int write_pages(char *argv[], char *pagebuf) {
     char *spare_start_address = sector_start_address + SECTOR_SIZE;
 
     memcpy(sector_start_address, argv[4], strlen(argv[4]));
-    memcpy(spare_start_address, argv[5], strlen(argv[5]));
+    int spare_val = atoi(argv[5]);
+    memcpy(spare_start_address, &spare_val, sizeof(spare_val));
 
     fdd_write(ppn, pagebuf);
 
@@ -180,23 +181,16 @@ int read_pages(char *argv[], char *pagebuf) {
     }
     nonErasedSector[index] = '\0';
 
-    // 스페어 영역에서 0xFF가 아닌 바이트만 필터링
-    char nonErasedSpare[SPARE_SIZE + 1];
-    index = 0;
-    for (int i = SECTOR_SIZE; i < PAGE_SIZE; i++) {
-        if ((unsigned char) pagebuf[i] != 0xFF) {
-            nonErasedSpare[index++] = pagebuf[i];
-        }
-    }
-    nonErasedSpare[index] = '\0';
+    int spare_val;
+    memcpy(&spare_val, pagebuf + SECTOR_SIZE, sizeof(spare_val));
 
     // 필터링한 결과가 모두 빈 문자열인 경우, 페이지가 초기화된 것으로 판단
-    if (strlen(nonErasedSector) == 0 && strlen(nonErasedSpare) == 0) {
+    if (strlen(nonErasedSector) == 0) {
         fclose(flashmemoryfp);
         return EXIT_SUCCESS;
     }
 
-    printf("%s %s\n", nonErasedSector, nonErasedSpare);
+    printf("%s %d\n", nonErasedSector, spare_val);
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
@@ -258,9 +252,8 @@ int inplace_update(char *argv[], char *pagebuf) {
     int len = strlen(new_sector);
     if (len > SECTOR_SIZE) len = SECTOR_SIZE;
     memcpy(updated_page, new_sector, len);
-    int spare_len = strlen(new_spare);
-    if (spare_len > SPARE_SIZE) spare_len = SPARE_SIZE;
-    memcpy(updated_page + SECTOR_SIZE, new_spare, spare_len);
+    int spare_val = atoi(new_spare);
+    memcpy(updated_page + SECTOR_SIZE, &spare_val, sizeof(spare_val));
 
     // 모든 페이지를 원래 위치에 쓰기
     int writes = 0;
