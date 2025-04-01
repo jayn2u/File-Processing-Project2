@@ -293,3 +293,38 @@ jobs:
             fi
             sleep 1
           done
+
+  inplace-update-data-verify-test:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+
+      - name: Create flash memory emulator
+        run: ./a.out c flashmemory 2
+
+      - name: Write arbitrary data to ppn 0, 1, 2, 3
+        run: |
+          ./a.out w flashmemory 0 "data0" "10"
+          ./a.out w flashmemory 1 "data1" "20"
+          ./a.out w flashmemory 2 "data2" "30"
+          ./a.out w flashmemory 3 "data3" "40"
+
+      - name: In-place update on ppn 2
+        run: ./a.out u flashmemory 2 "updatedData" "300"
+
+      - name: Verify data integrity after update
+        run: |
+          output0=$(./a.out r flashmemory 0)
+          output1=$(./a.out r flashmemory 1)
+          output2=$(./a.out r flashmemory 2)
+          output3=$(./a.out r flashmemory 3)
+          
+          [ "$output0" = "data0 10" ] || (echo "PPN 0 verification failed: expected 'data0 10', got '$output0'" && exit 1)
+          [ "$output1" = "data1 20" ] || (echo "PPN 1 verification failed: expected 'data1 20', got '$output1'" && exit 1)
+          [ "$output2" = "updatedData 300" ] || (echo "PPN 2 verification failed: expected 'updatedData 300', got '$output2'" && exit 1)
+          [ "$output3" = "data3 40" ] || (echo "PPN 3 verification failed: expected 'data3 40', got '$output3'" && exit 1)
