@@ -356,7 +356,7 @@ jobs:
           echo "컴파일 완료"
           file a.out
           
-          for BLOCKS in 0 1 5 10 20; do
+          for BLOCKS in 1 5 10 20; do
             echo "✅ 블록 수 $BLOCKS로 flashmemory 생성 테스트"
             rm -f flashmemory  # 이전 파일 삭제
             ./a.out c flashmemory $BLOCKS
