@@ -6,339 +6,8 @@ on:
       - feat/*
       - test
       - main
+
 jobs:
-  project1-test:
-    if: false
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: 저장소 체크아웃
-        uses: actions/checkout@v4
-
-      - name: C 컴파일러 설치
-        run: sudo apt update && sudo apt install -y gcc
-
-      - name: copy normal file
-        #if: github.ref == 'refs/heads/feat/copy'
-        run: |
-          gcc copy.c
-          echo -n "1234567891123456" > testfile.txt
-          ./a.out testfile.txt copy_test.txt
-          diff testfile.txt copy_test.txt && echo -n "✅ normal file 복사 테스트 통과" || exit 1
-          rm testfile.txt copy_test.txt
-
-      - name: copy empty file
-        #if: github.ref == 'refs/heads/feat/copy'
-        run: |
-          gcc copy.c
-          touch empty.txt
-          ./a.out empty.txt empty_copy.txt
-          diff empty.txt empty_copy.txt && echo -n "✅ empty file 복사 테스트 통과" || exit 1
-          rm empty.txt empty_copy.txt
-
-      - name: copy binary file
-        #if: github.ref == 'refs/heads/feat/copy'
-        run: |
-          gcc copy.c
-          head -c 1048576 /dev/urandom > binary_source.bin
-          ./a.out binary_source.bin binary_dest.bin
-          diff binary_source.bin binary_dest.bin && echo -n "✅ binary file 복사 테스트 통과"|| exit 1
-          rm binary_source.bin binary_dest.bin
-
-      - name: merge.c 컴파일 및 테스트
-        #if: github.ref == 'refs/heads/feat/merge'
-        run: |
-          gcc merge.c
-          echo -n "1234567890" > file1.txt
-          echo -n "abcdefghij" > file2.txt
-          ./a.out merged.txt file1.txt file2.txt
-          cat file1.txt file2.txt > expected.txt
-          
-          # 파일 크기 체크 (stat 사용)
-          expected_size=$(stat -c %s expected.txt)
-          merged_size=$(stat -c %s merged.txt)
-
-          echo -n "Expected Size: $expected_size bytes"
-          echo -n "Merged Size:   $merged_size bytes"
-
-          if [ "$expected_size" -ne "$merged_size" ]; then
-            echo -n "파일 크기 불일치 (병합 실패)"
-            exit 1
-          fi
-
-          # 파일 내용 체크 (diff 사용)
-          if diff merged.txt expected.txt; then
-            echo -n "병합 테스트 통과"
-          else
-            echo -n "파일 내용 불일치"
-            exit 1
-          fi
-
-      - name: read normal file
-        #if: github.ref == 'refs/heads/feat/read'
-        run: |
-          gcc read.c
-          echo -n "abcdefghijklmnopqrstuvwxyz" > readtest.txt
-          
-          # ✅ 테스트 1: 정상적인 경우
-          ./a.out 5 5 readtest.txt > output.txt
-          echo "fghij" > expected_read.txt
-          diff output.txt expected_read.txt && echo -n "✅ 테스트 1 통과" || exit 1
-          
-          # ✅ 테스트 2: 바이트 수가 0 (출력 없음)
-          rm -f output.txt
-          ./a.out 5 0 readtest.txt > output.txt
-          if [ $? -eq 0 ] && [ ! -s output.txt ]; then
-          echo -n "✅ 테스트 2 통과"
-          else
-          echo "❌ 테스트 2 실패"
-          exit 1
-          fi
-          
-          # ✅ 테스트 3: 파일 끝까지 읽는 경우
-          ./a.out 20 10 readtest.txt > output.txt
-          echo "uvwxyz" > expected_read.txt
-          diff output.txt expected_read.txt && echo -n "✅ 테스트 3 통과" || exit 1
-          
-          # ✅ 테스트 4: 오프셋이 파일 크기를 초과하는 경우 (출력 없음)
-          rm -f output.txt
-          ./a.out 30 5 readtest.txt > output.txt
-          
-          # 파일 존재 여부뿐만 아니라 크기가 0인지도 검사
-          if [ $? -eq 0 ] && [ ! -s output.txt ]; then
-          echo -n "✅ 테스트 4 통과"
-          else
-          echo "❌ 테스트 4 실패"
-          exit 1
-          fi
-          
-          # ✅ 테스트 5: 오프셋이 파일 끝일 경우 (출력 없음)
-          rm -f output.txt
-          ./a.out 26 5 readtest.txt > output.txt
-          if [ $? -eq 0 ] && ([ ! -f output.txt ] || [ ! -s output.txt ]); then
-          echo -n "✅ 테스트 5 통과"
-          else
-          echo "❌ 테스트 5 실패"
-          exit 1
-          fi
-
-          # ✅ 테스트 6: 파일 전체 읽기
-          ./a.out 0 26 readtest.txt > output.txt
-          echo "abcdefghijklmnopqrstuvwxyz" > expected_read.txt
-          diff output.txt expected_read.txt && echo -n "✅ 테스트 6 통과" || exit 1
-
-      - name: write.c 컴파일 및 테스트
-        #if: github.ref == 'refs/heads/feat/write'
-        run: |
-          gcc write.c
-          echo -n "abcdefghij" > writetest.txt
-          
-          # ✅ 테스트 1: 일반적인 덮어쓰기
-          ./a.out 3 "XYZ" writetest.txt
-          echo -n "abcXYZghij" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 1 통과" || exit 1
-
-          # ✅ 테스트 2: 파일 끝에서 덮어쓰기 (EOF 넘어감)
-          echo -n "abcdefghij" > writetest.txt
-          ./a.out 8 "XYZ" writetest.txt
-          echo -n "abcdefghXYZ" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 2 통과" || exit 1
-
-          # ✅ 테스트 3: 파일 크기보다 큰 오프셋에서 덮어쓰기 (빈 공간 생성)
-          echo -n "abcdefghij" > writetest.txt
-          ./a.out 15 "XYZ" writetest.txt
-          printf "abcdefghij\x00\x00\x00\x00\x00XYZ" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 3 통과" || exit 1
-
-          # ✅ 테스트 4: 파일 처음부터 덮어쓰기
-          echo -n "abcdefghij" > writetest.txt
-          ./a.out 0 "XYZ" writetest.txt
-          echo -n "XYZdefghij" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 4 통과" || exit 1
-
-          # ✅ 테스트 5: 파일 전체 덮어쓰기 (파일 크기보다 큰 데이터)
-          echo -n "abcdefghij" > writetest.txt
-          ./a.out 0 "ABCDEFGHIJKLMNO" writetest.txt
-          echo -n "ABCDEFGHIJKLMNO" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 5 통과" || exit 1
-
-          # ✅ 테스트 6: 오프셋이 0이고 데이터가 빈 문자열
-          echo -n "abcdefghij" > writetest.txt
-          ./a.out 0 "" writetest.txt
-          echo -n "abcdefghij" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 6 통과" || exit 1
-
-          # ✅ 테스트 7: 오프셋이 파일 끝이고 데이터가 빈 문자열
-          echo -n "abcdefghij" > writetest.txt
-          ./a.out 10 "" writetest.txt
-          echo -n "abcdefghij" > expected_write.txt
-          diff writetest.txt expected_write.txt && echo -n "✅ 테스트 7 통과" || exit 1
-
-      - name: insert.c 컴파일 및 테스트
-        #if: github.ref == 'refs/heads/feat/insert'
-        run: |
-          gcc insert.c
-          echo -n "abcdefghij" > inserttest.txt
-          
-          # ✅ 테스트 1: 일반적인 끼워넣기 (5와 6 사이에 "XYZ" 삽입)
-          ./a.out 5 "XYZ" inserttest.txt
-          echo -n "abcdefXYZghij" > expected_insert.txt
-          diff inserttest.txt expected_insert.txt && echo -n "✅ 테스트 1 통과" || exit 1
-
-          # ✅ 테스트 2: 파일 끝에서 끼워넣기 (append 처리)
-          echo -n "abcdefghij" > inserttest.txt
-          ./a.out 10 "XYZ" inserttest.txt
-          echo -n "abcdefghijXYZ" > expected_insert.txt
-          diff inserttest.txt expected_insert.txt && echo -n "✅ 테스트 2 통과" || exit 1
-
-          # ✅ 테스트 3: 파일 처음에 데이터 삽입
-          echo -n "abcdefghij" > inserttest.txt
-          ./a.out 0 "XYZ" inserttest.txt
-          echo -n "aXYZbcdefghij" > expected_insert.txt
-          diff inserttest.txt expected_insert.txt && echo -n "✅ 테스트 3 통과" || exit 1
-
-          # ✅ 테스트 4: 파일 크기를 초과하는 오프셋 (append 처리)
-          echo -n "abcdefghij" > inserttest.txt
-          ./a.out 15 "XYZ" inserttest.txt
-          echo -n "abcdefghijXYZ" > expected_insert.txt
-          diff inserttest.txt expected_insert.txt && echo -n "✅ 테스트 4 통과" || exit 1
-
-          # ✅ 테스트 5: 빈 문자열 삽입 (변경 없음)
-          echo -n "abcdefghij" > inserttest.txt
-          ./a.out 5 "" inserttest.txt
-          echo -n "abcdefghij" > expected_insert.txt
-          diff inserttest.txt expected_insert.txt && echo -n "✅ 테스트 5 통과" || exit 1
-
-          # ✅ 테스트 6: 오프셋이 파일 끝이고 빈 문자열 삽입 (변경 없음)
-          echo -n "abcdefghij" > inserttest.txt
-          ./a.out 10 "" inserttest.txt
-          echo -n "abcdefghij" > expected_insert.txt
-          diff inserttest.txt expected_insert.txt && echo -n "✅ 테스트 6 통과" || exit 1
-
-      - name: delete.c 컴파일 및 테스트
-        #if: github.ref == 'refs/heads/feat/delete'
-        run: |
-          gcc delete.c
-          echo -n "abcdefghij" > deletetest.txt
-          
-          # ✅ 테스트 1: 일반적인 삭제 (2번 오프셋부터 3바이트 삭제)
-          ./a.out 2 3 deletetest.txt
-          echo -n "abfghij" > expected_delete.txt
-          diff deletetest.txt expected_delete.txt && echo -n "✅ 테스트 1 통과" || exit 1
-
-          # ✅ 테스트 2: 파일 끝에서 일부 삭제
-          echo -n "abcdefghij" > deletetest.txt
-          ./a.out 7 3 deletetest.txt
-          echo -n "abcdefg" > expected_delete.txt
-          diff deletetest.txt expected_delete.txt && echo -n "✅ 테스트 2 통과" || exit 1
-
-          # ✅ 테스트 3: 파일 전체 삭제
-          echo -n "abcdefghij" > deletetest.txt
-          ./a.out 0 10 deletetest.txt
-          echo -n "" > expected_delete.txt
-          diff deletetest.txt expected_delete.txt && echo -n "✅ 테스트 3 통과" || exit 1
-
-          # ✅ 테스트 4: 바이트 수가 0인 경우 (변경 없음)
-          echo -n "abcdefghij" > deletetest.txt
-          ./a.out 3 0 deletetest.txt
-          echo -n "abcdefghij" > expected_delete.txt
-          diff deletetest.txt expected_delete.txt && echo -n "✅ 테스트 4 통과" || exit 1
-
-          # ✅ 테스트 5: 삭제할 바이트 수가 파일 크기를 초과하는 경우
-          echo -n "abcdefghij" > deletetest.txt
-          ./a.out 3 20 deletetest.txt
-          echo -n "abc" > expected_delete.txt
-          diff deletetest.txt expected_delete.txt && echo -n "✅ 테스트 5 통과" || exit 1
-
-          # ✅ 테스트 6: 오프셋이 파일 크기를 초과하는 경우 (변경 없음)
-          echo -n "abcdefghij" > deletetest.txt
-          ./a.out 15 3 deletetest.txt
-          echo -n "abcdefghij" > expected_delete.txt
-          diff deletetest.txt expected_delete.txt && echo -n "✅ 테스트 6 통과" || exit 1
-
-      - name: copy 멀티라인 파일 테스트
-        run: |
-          gcc copy.c
-          cat <<EOF > multiline_source.txt
-          첫번째 줄
-          두번째 줄
-          세번째 줄
-          EOF
-          ./a.out multiline_source.txt multiline_dest.txt
-          diff multiline_source.txt multiline_dest.txt && echo -n "✅ 멀티라인 파일 복사 테스트 통과" || exit 1
-          rm multiline_source.txt multiline_dest.txt
-
-      - name: merge 멀티라인 파일 테스트
-        run: |
-          gcc merge.c
-          cat <<EOF > file1_multiline.txt
-          첫번째 줄
-          두번째 줄
-          EOF
-          cat <<EOF > file2_multiline.txt
-          세번째 줄
-          네번째 줄
-          EOF
-          ./a.out output_multiline.txt file1_multiline.txt file2_multiline.txt
-          cat file1_multiline.txt file2_multiline.txt > expected_multiline.txt
-          diff output_multiline.txt expected_multiline.txt && echo -n "✅ 멀티라인 파일 병합 테스트 통과" || exit 1
-          rm file1_multiline.txt file2_multiline.txt expected_multiline.txt output_multiline.txt
-
-      - name: read 멀티라인 테스트
-        run: |
-          gcc read.c
-          cat <<EOF > multiline_test.txt
-          line1
-          line2
-          line3
-          EOF
-          expected_output=$(printf "line1\nline2\nline3")
-          output=$(./a.out 0 17 multiline_test.txt)
-          if [ "$output" != "$expected_output" ]; then
-            echo "❌ 멀티라인 read 테스트 실패: 예상 결과 '$expected_output', 실제 결과 '$output'"
-            exit 1
-          else
-            echo -n "✅ 멀티라인 read 테스트 통과"
-          fi
-          rm multiline_test.txt
-
-      - name: write 멀티라인 테스트
-        run: |
-          gcc write.c
-          cat <<EOF > test_write_multiline.txt
-          line1
-          line2
-          line3
-          EOF
-          ./a.out 6 "NEW" test_write_multiline.txt
-          expected_content=$(printf "line1\nNEWe2\nline3")
-          actual_content=$(cat test_write_multiline.txt)
-          if [ "$actual_content" != "$expected_content" ]; then
-            echo "❌ write 멀티라인 테스트 실패: 예상 결과 '$expected_content', 실제 결과 '$actual_content'"
-            exit 1
-          else
-            echo -n "✅ write 멀티라인 테스트 통과"
-          fi
-          rm test_write_multiline.txt
-
-      - name: insert 멀티라인 테스트
-        run: |
-          gcc insert.c
-          printf "line1\nline2\nline3" > insert_multiline.txt
-          ./a.out 6 "INSERT" insert_multiline.txt
-          expected=$(printf "line1\nlINSERTine2\nline3")
-          diff insert_multiline.txt <(echo -n "$expected") && echo -n "✅ insert 멀티라인 테스트 통과" || exit 1
-          rm insert_multiline.txt
-
-      - name: delete 멀티라인 테스트
-        run: |
-          gcc delete.c
-          printf "line1\nline2\nline3" > delete_multiline.txt
-          ./a.out 6 3 delete_multiline.txt
-          expected=$(printf "line1\ne2\nline3")
-          diff delete_multiline.txt <(echo -n "$expected") && echo -n "✅ delete 멀티라인 테스트 통과" || exit 1
-          rm delete_multiline.txt  
-
   project2-test:
     runs-on: ubuntu-22.04
 
@@ -402,54 +71,57 @@ jobs:
         run: |
           gcc -o a.out ftlmgr.c fdevicedriver.c
           
-          #  테스트 1: 정상적인 읽기
+          # 테스트 1: 정상적인 읽기
           ./a.out w flashmemory 2 "abcd12345@%$" "12"
           ./a.out r flashmemory 2 > r1.txt
           grep -q "abcd12345@%$ 12" r1.txt && echo "✅ read 테스트 1 통과" || (echo "❌ read 테스트 1 실패" && cat r1.txt && exit 1)
           rm flashmemory
 
-          #  테스트 2: sector가 비어 있으면 출력 안 함
+          # 테스트 2: sector가 비어 있으면 출력 안 함
           ./a.out w flashmemory 2 "" "12"
           ./a.out r flashmemory 2 > r2.txt
           [ ! -s r2.txt ] && echo "✅ read 테스트 2 통과" || (echo "❌ read 테스트 2 실패 (출력 있음)" && cat r2.txt && exit 1)
           rm flashmemory
 
-          #  테스트 3: 완전 빈 페이지 (아무것도 안 씀)
+          # 테스트 3: 완전 빈 페이지 (아무것도 안 씀)
           ./a.out c flashmemory 4
           ./a.out r flashmemory 4 > r3.txt
           [ ! -s r3.txt ] && echo "✅ read 테스트 3 통과" || (echo "❌ read 테스트 3 실패 (출력 있음)" && cat r3.txt && exit 1)
 
-          #  테스트 4: 덮어쓰기 방지된 페이지 읽기
+          # 테스트 4: 덮어쓰기 방지된 페이지 읽기
           ./a.out w flashmemory 5 "firstdata" "55"
           ./a.out w flashmemory 5 "second" "99"  # 무시돼야 함
           ./a.out r flashmemory 5 > r4.txt
+          # "firstdata 55"가 출력에 포함되어 있는지 확인
           grep -q "firstdata 55" r4.txt && echo "✅ read 테스트 4 통과" || (echo "❌ read 테스트 4 실패" && cat r4.txt && exit 1)
 
-          #  정리
+          # 정리
           rm -f flashmemory r1.txt r2.txt r3.txt r4.txt
 
       - name: erase 명령 테스트
         run: |
-          # ✅ Step 1: 플래시 생성 (1 블록 = 8 페이지)
+          gcc -o a.out ftlmgr.c fdevicedriver.c
+          # Step 1: 플래시 생성 (1 블록 = 8 페이지)
           ./a.out c flashmemory 1
 
-          # ✅ Step 2: 페이지에 데이터 작성 (ppn = 4는 block 0에 속함)
+          # Step 2: 페이지에 데이터 작성 (ppn = 4는 block 0에 속함)
           ./a.out w flashmemory 4 "beforeErase" "999"
           ./a.out r flashmemory 4 > before.txt
           grep -q "beforeErase 999" before.txt && echo "✅ erase 전 쓰기 확인" || (echo "❌ 쓰기 실패" && cat before.txt && exit 1)
 
-          # ✅ Step 3: 블록 0 소거
+          # Step 3: 블록 0 소거
           ./a.out e flashmemory 0
 
-          # ✅ Step 4: 소거된 페이지는 출력 없어야 함 (sector, spare 모두 지워졌는지)
+          # Step 4: 소거된 페이지는 출력 없어야 함 (sector, spare 모두 지워졌는지)
           ./a.out r flashmemory 4 > after.txt
           [ ! -s after.txt ] && echo "✅ erase 후 페이지 초기화 확인" || (echo "❌ erase 실패 (데이터 남음)" && cat after.txt && exit 1)
 
-          # ✅ 정리
+          # 정리
           rm -f flashmemory before.txt after.txt
 
       - name: update 명령 다양한 케이스 테스트
         run: |
+          gcc -o a.out ftlmgr.c fdevicedriver.c
           #########################################
           echo "🧪 T1. 기본 update 동작 테스트"
           ./a.out c flashmemory 3
@@ -482,6 +154,7 @@ jobs:
           #########################################
           echo "🧹 테스트 종료 후 정리"
           rm -f flashmemory out*.txt log*.txt
+
       - name: 추가 테스트
         run: |
           gcc -o a.out ftlmgr.c fdevicedriver.c
@@ -778,7 +451,6 @@ jobs:
           else
           echo "✅ TEST 2 통과"
           fi
-          
           
           ./a.out c flashmemory 10
           READ_OUTPUT=$(./a.out r flashmemory 7)
