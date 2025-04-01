@@ -148,6 +148,31 @@ int write_pages(char *argv[], char *pagebuf) {
 
     int ppn = atoi(argv[3]);
 
+    // 읽어와서 페이지가 초기화되었는지(모든 바이트가 0xFF인지) 확인
+    if (fdd_read(ppn, pagebuf) != 1) {
+        fprintf(stderr, "페이지 읽기 실패: %d\n", ppn);
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
+
+    int is_erased = 1;
+    for (int i = 0; i < PAGE_SIZE; i++) {
+        if ((unsigned char)pagebuf[i] != 0xFF) {
+            is_erased = 0;
+            break;
+        }
+    }
+
+    if (!is_erased) {
+        fprintf(stderr, "페이지에 이미 데이터가 존재합니다. 덮어쓰기 방지: %d\n", ppn);
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
+
+    // 페이지 버퍼 초기화
+    memset(pagebuf, 0xFF, PAGE_SIZE);
+
+    // 새 데이터를 페이지 버퍼에 채움
     char *sector_start_address = pagebuf;
     char *spare_start_address = sector_start_address + SECTOR_SIZE;
 
@@ -155,7 +180,11 @@ int write_pages(char *argv[], char *pagebuf) {
     int spare_val = atoi(argv[5]);
     memcpy(spare_start_address, &spare_val, sizeof(spare_val));
 
-    fdd_write(ppn, pagebuf);
+    if (fdd_write(ppn, pagebuf) != 1) {
+        fprintf(stderr, "페이지 쓰기 실패: %d\n", ppn);
+        fclose(flashmemoryfp);
+        return EXIT_FAILURE;
+    }
 
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
