@@ -273,37 +273,37 @@ jobs:
           [ "$output2" = "updatedData 300" ] || (echo "PPN 2 verification failed: expected 'updatedData 300', got '$output2'" && exit 1)
           [ "$output3" = "data3 40" ] || (echo "PPN 3 verification failed: expected 'data3 40', got '$output3'" && exit 1)
 
-    inplace-update-full-block-test:
-      needs: build
-      runs-on: ubuntu-22.04
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v3
+  inplace-update-full-block-test:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-        - name: Compile ftlmgr
-          run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
+      - name: Compile ftlmgr
+        run: gcc -std=c11 -Wall -Wextra -o a.out ftlmgr.c fdevicedriver.c
 
-        - name: Create flash memory emulator with 3 blocks
-          run: ./a.out c flashmemory 3
+      - name: Create flash memory emulator with 3 blocks
+        run: ./a.out c flashmemory 3
 
-        - name: Fill block 0 and block 1 completely
-          run: |
-            # 블록 0: ppn 0 ~ 7 채우기
-            for i in {0..7}; do
-              ./a.out w flashmemory $i "block0_page$i" "$((i+10))"
-            done
-            # 블록 1: ppn 8 ~ 15 채우기
-            for i in {8..15}; do
-              ./a.out w flashmemory $i "block1_page$i" "$((i+10))"
-            done
+      - name: Fill block 0 and block 1 completely
+        run: |
+          # 블록 0: ppn 0 ~ 7 채우기
+          for i in {0..7}; do
+            ./a.out w flashmemory $i "block0_page$i" "$((i+10))"
+          done
+          # 블록 1: ppn 8 ~ 15 채우기
+          for i in {8..15}; do
+            ./a.out w flashmemory $i "block1_page$i" "$((i+10))"
+          done
 
-        - name: Perform in-place update on page 10 in block 1
-          run: |
-            # ppn=10는 블록 1에 속함
-            ./a.out u flashmemory 10 "updatedData" "200"
-            output=$(./a.out r flashmemory 10)
-            expected="updatedData 200"
-            if [ "$output" != "$expected" ]; then
-              echo "In-place update test failed: expected '$expected', got '$output'"
-              exit 1
-            fi
+      - name: Perform in-place update on page 10 in block 1
+        run: |
+          # ppn=10는 블록 1에 속함
+          ./a.out u flashmemory 10 "updatedData" "200"
+          output=$(./a.out r flashmemory 10)
+          expected="updatedData 200"
+          if [ "$output" != "$expected" ]; then
+            echo "In-place update test failed: expected '$expected', got '$output'"
+            exit 1
+          fi
