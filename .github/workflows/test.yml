@@ -2,9 +2,9 @@ name: Project2 CI
 
 on:
   push:
-    branches: [ main, rethink ]
+    branches: [  ]
   pull_request:
-    branches: [ main ]
+    branches: [  ]
 
 jobs:
   build:
