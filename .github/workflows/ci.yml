@@ -8,9 +8,8 @@ on:
       - main
 
 jobs:
-  project2-test:
+  project2-flashmemory-test:
     runs-on: ubuntu-22.04
-
     steps:
       - name: 저장소 체크아웃
         uses: actions/checkout@v4
@@ -45,6 +44,15 @@ jobs:
             echo ""
           done
 
+  project2-write-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
+
       - name: write 명령 테스트
         run: |
           gcc -o a.out ftlmgr.c fdevicedriver.c
@@ -66,6 +74,15 @@ jobs:
 
           # 정리
           rm -f flashmemory written.txt written2.txt try.txt
+
+  project2-read-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
 
       - name: read 명령 테스트
         run: |
@@ -92,11 +109,19 @@ jobs:
           ./a.out w flashmemory 5 "firstdata" "55"
           ./a.out w flashmemory 5 "second" "99"  # 무시돼야 함
           ./a.out r flashmemory 5 > r4.txt
-          # "firstdata 55"가 출력에 포함되어 있는지 확인
           grep -q "firstdata 55" r4.txt && echo "✅ read 테스트 4 통과" || (echo "❌ read 테스트 4 실패" && cat r4.txt && exit 1)
 
           # 정리
           rm -f flashmemory r1.txt r2.txt r3.txt r4.txt
+
+  project2-erase-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
 
       - name: erase 명령 테스트
         run: |
@@ -118,6 +143,15 @@ jobs:
 
           # 정리
           rm -f flashmemory before.txt after.txt
+
+  project2-update-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
 
       - name: update 명령 다양한 케이스 테스트
         run: |
@@ -154,6 +188,15 @@ jobs:
           #########################################
           echo "🧹 테스트 종료 후 정리"
           rm -f flashmemory out*.txt log*.txt
+
+  project2-additional-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
 
       - name: 추가 테스트
         run: |
@@ -215,6 +258,15 @@ jobs:
           echo "🧹 정리"
           rm -f flashmemory beforeErase.txt afterErase.txt out*.txt
 
+  project2-create-flashmemory-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
+
       - name: create flash memory
         run: |
           gcc ftlmgr.c fdevicedriver.c -o a.out
@@ -239,6 +291,15 @@ jobs:
           
           echo ""
           done
+
+  project2-write-page-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
 
       - name: write page
         run: |
@@ -421,6 +482,15 @@ jobs:
           echo "🎉 write-page-test 5 성공!"
           fi
 
+  project2-read-page-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
+
       - name: read page
         run: |
           gcc ftlmgr.c fdevicedriver.c -o a.out
@@ -462,6 +532,15 @@ jobs:
           echo "✅ TEST 3 통과"
           fi
 
+  project2-erase-page-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
+
       - name: erase page
         run: |
           gcc ftlmgr.c fdevicedriver.c -o a.out
@@ -484,6 +563,15 @@ jobs:
           fi
           done
           echo "✅ erase-block-test 통과: 블록 3 전체가 정상적으로 삭제됨 (0xFF)"
+
+  project2-inplace-update-test:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: C 컴파일러 설치
+        run: sudo apt update && sudo apt install -y gcc
 
       - name: In-place update
         run: |
