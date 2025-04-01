@@ -212,21 +212,27 @@ int erase_block(char *argv[]) {
 }
 
 int inplace_update(char *argv[], char *pagebuf) {
+    // 파일 열기
     flashmemoryfp = fopen(argv[2], "rb+");
     if (flashmemoryfp == NULL) {
         fprintf(stderr, "flashmemoryfp 파일 열기에 실패했습니다.\n");
         return EXIT_FAILURE;
     }
 
+    // 페이지 및 블록 계산
     int ppn = atoi(argv[3]);
     int pbn = ppn / PAGE_NUM;
     int offset = ppn % PAGE_NUM;
+
+    // 새로운 데이터 준비
     char *new_sector = argv[4];
     char *new_spare = argv[5];
 
-    // 블록의 모든 페이지를 메모리에 읽기
+    // 통계 변수 초기화
+    int read_cnt = 0, write_cnt = 0, erase_cnt = 0;
+
+    // 1. 블록의 모든 페이지 읽기
     char block_pages[PAGE_NUM][PAGE_SIZE];
-    int reads = 0;
     for (int i = 0; i < PAGE_NUM; i++) {
         int current_ppn = pbn * PAGE_NUM + i;
         if (fdd_read(current_ppn, block_pages[i]) != 1) {
@@ -234,19 +240,18 @@ int inplace_update(char *argv[], char *pagebuf) {
             fclose(flashmemoryfp);
             return EXIT_FAILURE;
         }
-        reads++;
+        read_cnt++;
     }
 
-    // 블록 지우기
-    int erases = 0;
+    // 2. 블록 소거
     if (fdd_erase(pbn) != 1) {
         fprintf(stderr, "블록 소거 실패: %d\n", pbn);
         fclose(flashmemoryfp);
         return EXIT_FAILURE;
     }
-    erases++;
+    erase_cnt++;
 
-    // 업데이트된 페이지 준비
+    // 3. 갱신할 페이지 버퍼 준비
     char updated_page[PAGE_SIZE];
     memset(updated_page, 0xFF, PAGE_SIZE);
     int len = strlen(new_sector);
@@ -255,8 +260,7 @@ int inplace_update(char *argv[], char *pagebuf) {
     int spare_val = atoi(new_spare);
     memcpy(updated_page + SECTOR_SIZE, &spare_val, sizeof(spare_val));
 
-    // 모든 페이지를 원래 위치에 쓰기
-    int writes = 0;
+    // 4. 블록의 모든 페이지 다시 쓰기
     for (int i = 0; i < PAGE_NUM; i++) {
         int current_ppn = pbn * PAGE_NUM + i;
         if (i == offset) {
@@ -272,10 +276,12 @@ int inplace_update(char *argv[], char *pagebuf) {
                 return EXIT_FAILURE;
             }
         }
-        writes++;
+        write_cnt++;
     }
 
-    printf("#reads=%d #writes=%d #erases=%d", reads, writes, erases);
+    // 5. 결과 출력
+    printf("#reads=%d #writes=%d #erases=%d", read_cnt, write_cnt, erase_cnt);
+
     fclose(flashmemoryfp);
     return EXIT_SUCCESS;
 }
